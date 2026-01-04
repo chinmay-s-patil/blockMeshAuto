@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, simpledialog
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
@@ -17,8 +17,9 @@ class MeshBuilderApp:
         
         self.mesh_data = MeshData()
         self.selected_points = []
-        self.click_to_add = True  # Toggle for adding points
-        self.click_to_delete = False  # Toggle for deleting points
+        self.mode = "select"  # "add", "delete", or "select"
+        self.iso_mode = False
+        self.iso_layers = []  # For linking between layers
         
         self.setup_notebook()
         self.setup_2d_view()
@@ -69,23 +70,28 @@ class MeshBuilderApp:
         mode_frame = tk.LabelFrame(right_frame, text="Mode", padx=10, pady=10)
         mode_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        self.add_point_btn = tk.Button(mode_frame, text="✓ Click to Add Points", 
-                                        command=self.toggle_add_mode, bg="lightgreen")
-        self.add_point_btn.pack(fill=tk.X, pady=2)
+        self.select_btn = tk.Button(mode_frame, text="Select Points (Connect)", 
+                                     command=lambda: self.set_mode("select"), 
+                                     relief=tk.SUNKEN, bg="lightblue")
+        self.select_btn.pack(fill=tk.X, pady=2)
         
-        self.delete_point_btn = tk.Button(mode_frame, text="Click to Delete Points", 
-                                          command=self.toggle_delete_mode)
-        self.delete_point_btn.pack(fill=tk.X, pady=2)
+        self.add_btn = tk.Button(mode_frame, text="Add Points", 
+                                 command=lambda: self.set_mode("add"))
+        self.add_btn.pack(fill=tk.X, pady=2)
         
-        self.mode_label = tk.Label(mode_frame, text="Mode: Adding Points", 
-                                   font=("Arial", 9, "bold"), fg="green")
+        self.delete_btn = tk.Button(mode_frame, text="Delete Points", 
+                                    command=lambda: self.set_mode("delete"))
+        self.delete_btn.pack(fill=tk.X, pady=2)
+        
+        self.mode_label = tk.Label(mode_frame, text="Current Mode: Select", 
+                                   font=("Arial", 10, "bold"), fg="blue")
         self.mode_label.pack(pady=5)
         
         # Layer management
         layer_frame = tk.LabelFrame(right_frame, text="Layers (Z-values)", padx=10, pady=10)
         layer_frame.pack(fill=tk.BOTH, padx=5, pady=5)
         
-        self.layer_listbox = tk.Listbox(layer_frame, height=6)
+        self.layer_listbox = tk.Listbox(layer_frame, height=6, selectmode=tk.EXTENDED)
         self.layer_listbox.pack(fill=tk.BOTH, expand=True)
         self.layer_listbox.bind('<<ListboxSelect>>', self.on_layer_select)
         self.update_layer_list()
@@ -93,12 +99,25 @@ class MeshBuilderApp:
         layer_btn_frame = tk.Frame(layer_frame)
         layer_btn_frame.pack(fill=tk.X, pady=(5, 0))
         
-        tk.Button(layer_btn_frame, text="Add Layer", command=self.add_layer).pack(side=tk.LEFT, padx=2)
-        tk.Button(layer_btn_frame, text="Remove", command=self.remove_layer).pack(side=tk.LEFT, padx=2)
+        tk.Button(layer_btn_frame, text="Add", command=self.add_layer, width=6).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Duplicate", command=self.duplicate_layer, width=8).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Remove", command=self.remove_layer, width=7).pack(side=tk.LEFT, padx=1)
         
         self.layer_info = tk.Label(layer_frame, text=f"Current: {self.mesh_data.current_layer}", 
                                    font=("Arial", 9, "bold"), fg="blue")
         self.layer_info.pack(pady=5)
+        
+        # Iso mode
+        iso_frame = tk.Frame(layer_frame)
+        iso_frame.pack(fill=tk.X, pady=5)
+        
+        self.iso_mode_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(iso_frame, text="Iso Mode (Link 2 Layers)", 
+                      variable=self.iso_mode_var, command=self.toggle_iso_mode).pack()
+        
+        self.iso_label = tk.Label(layer_frame, text="Select 2 layers for Iso Mode", 
+                                 font=("Arial", 8, "italic"), fg="gray")
+        self.iso_label.pack()
         
         # Manual point entry
         manual_frame = tk.LabelFrame(right_frame, text="Manual Entry", padx=10, pady=10)
@@ -168,6 +187,10 @@ class MeshBuilderApp:
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(5, 0))
         right_frame.pack_propagate(False)
         
+        # Update button
+        tk.Button(right_frame, text="🔄 Update 3D View", command=self.update_3d_view,
+                 bg="lightgreen", font=("Arial", 11, "bold")).pack(fill=tk.X, padx=5, pady=5)
+        
         # Face selection info
         info_frame = tk.LabelFrame(right_frame, text="Face Selection", padx=10, pady=10)
         info_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -204,9 +227,6 @@ class MeshBuilderApp:
         self.patch_listbox = tk.Listbox(list_frame)
         self.patch_listbox.pack(fill=tk.BOTH, expand=True)
         
-        tk.Button(list_frame, text="Update 3D View", 
-                 command=self.update_3d_view).pack(fill=tk.X, pady=5)
-        
     def setup_patch_view(self):
         """Setup export interface"""
         main_frame = tk.Frame(self.tab_export)
@@ -241,20 +261,35 @@ class MeshBuilderApp:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.preview_text.pack(fill=tk.BOTH, expand=True)
         
-    # Mode toggle functions
-    def toggle_add_mode(self):
-        self.click_to_add = True
-        self.click_to_delete = False
-        self.add_point_btn.config(bg="lightgreen", text="✓ Click to Add Points")
-        self.delete_point_btn.config(bg="SystemButtonFace", text="Click to Delete Points")
-        self.mode_label.config(text="Mode: Adding Points", fg="green")
+    # Mode management
+    def set_mode(self, mode):
+        """Set current editing mode"""
+        self.mode = mode
         
-    def toggle_delete_mode(self):
-        self.click_to_add = False
-        self.click_to_delete = True
-        self.add_point_btn.config(bg="SystemButtonFace", text="Click to Add Points")
-        self.delete_point_btn.config(bg="salmon", text="✓ Click to Delete Points")
-        self.mode_label.config(text="Mode: Deleting Points", fg="red")
+        # Reset all button states
+        self.select_btn.config(relief=tk.RAISED, bg="SystemButtonFace")
+        self.add_btn.config(relief=tk.RAISED, bg="SystemButtonFace")
+        self.delete_btn.config(relief=tk.RAISED, bg="SystemButtonFace")
+        
+        # Set active button
+        if mode == "select":
+            self.select_btn.config(relief=tk.SUNKEN, bg="lightblue")
+            self.mode_label.config(text="Current Mode: Select", fg="blue")
+        elif mode == "add":
+            self.add_btn.config(relief=tk.SUNKEN, bg="lightgreen")
+            self.mode_label.config(text="Current Mode: Add", fg="green")
+        elif mode == "delete":
+            self.delete_btn.config(relief=tk.SUNKEN, bg="salmon")
+            self.mode_label.config(text="Current Mode: Delete", fg="red")
+    
+    def toggle_iso_mode(self):
+        """Toggle iso mode for linking between layers"""
+        self.iso_mode = self.iso_mode_var.get()
+        if self.iso_mode:
+            self.iso_label.config(text="Iso Mode Active", fg="green")
+        else:
+            self.iso_label.config(text="Select 2 layers for Iso Mode", fg="gray")
+        self.update_2d_plot()
         
     # 2D View functions
     def on_2d_click(self, event):
@@ -262,6 +297,12 @@ class MeshBuilderApp:
             return
         
         x, y = event.xdata, event.ydata
+        
+        if self.iso_mode and len(self.iso_layers) == 2:
+            # In iso mode, clicking adds inter-layer connection
+            self.handle_iso_click(x, y)
+            return
+        
         layer = self.mesh_data.current_layer
         points = self.mesh_data.points[layer]
         
@@ -273,24 +314,40 @@ class MeshBuilderApp:
                 clicked_idx = idx
                 break
         
-        if clicked_idx is not None:
-            if self.click_to_delete:
-                # Delete point
+        if self.mode == "delete":
+            if clicked_idx is not None:
                 self.mesh_data.remove_point(layer, clicked_idx)
                 self.clear_selection()
-            else:
-                # Select point for connection
+        elif self.mode == "add":
+            if clicked_idx is None:
+                self.mesh_data.add_point(layer, x, y)
+        elif self.mode == "select":
+            if clicked_idx is not None:
                 if clicked_idx not in self.selected_points:
                     self.selected_points.append(clicked_idx)
                     if len(self.selected_points) > 2:
                         self.selected_points.pop(0)
                 self.selection_label.config(text=f"Selected: {self.selected_points}")
-        else:
-            if self.click_to_add:
-                # Add new point
-                self.mesh_data.add_point(layer, x, y)
         
         self.update_2d_plot()
+    
+    def handle_iso_click(self, x, y):
+        """Handle clicks in iso mode for inter-layer connections"""
+        # Find which layer the click is closest to
+        for layer in self.iso_layers:
+            points = self.mesh_data.points[layer]
+            for idx, (px, py) in enumerate(points):
+                dist = np.sqrt((px - x)**2 + (py - y)**2)
+                if dist < 0.5:
+                    # Add to selection with layer info
+                    point_ref = (layer, idx)
+                    if point_ref not in self.selected_points:
+                        self.selected_points.append(point_ref)
+                        if len(self.selected_points) > 2:
+                            self.selected_points.pop(0)
+                    self.selection_label.config(text=f"Selected: {self.selected_points}")
+                    self.update_2d_plot()
+                    return
         
     def add_point_manual(self):
         try:
@@ -308,9 +365,20 @@ class MeshBuilderApp:
             messagebox.showwarning("Warning", "Select exactly 2 points")
             return
         
-        self.mesh_data.add_connection(self.mesh_data.current_layer, 
-                                     self.selected_points[0], 
-                                     self.selected_points[1])
+        # Check if iso mode connection (between layers)
+        if self.iso_mode and isinstance(self.selected_points[0], tuple):
+            layer1, idx1 = self.selected_points[0]
+            layer2, idx2 = self.selected_points[1]
+            if layer1 != layer2:
+                # Add inter-layer connection
+                self.mesh_data.add_inter_layer_connection(layer1, idx1, layer2, idx2)
+                messagebox.showinfo("Success", f"Connected {layer1}[{idx1}] to {layer2}[{idx2}]")
+        else:
+            # Same layer connection
+            self.mesh_data.add_connection(self.mesh_data.current_layer, 
+                                         self.selected_points[0], 
+                                         self.selected_points[1])
+        
         self.clear_selection()
         self.update_2d_plot()
         
@@ -329,30 +397,63 @@ class MeshBuilderApp:
         self.ax_2d.set_xlabel("X")
         self.ax_2d.set_ylabel("Y")
         
-        layer = self.mesh_data.current_layer
-        z = self.mesh_data.layers[layer]
-        self.ax_2d.set_title(f"Layer: {layer} (z={z})")
-        
-        # Grid lines
-        for i in range(-10, 11, max(1, 20 // subdivs)):
-            self.ax_2d.axhline(y=i, color='gray', alpha=0.2, linewidth=0.5)
-            self.ax_2d.axvline(x=i, color='gray', alpha=0.2, linewidth=0.5)
-        
-        # Connections
-        points = self.mesh_data.points[layer]
-        for conn in self.mesh_data.connections[layer]:
-            p1, p2 = points[conn[0]], points[conn[1]]
-            self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'b-', linewidth=1.5)
-        
-        # Points
-        if points:
-            xs, ys = zip(*points)
-            self.ax_2d.plot(xs, ys, 'ro', markersize=8)
+        # Draw layers based on mode
+        if self.iso_mode and len(self.iso_layers) == 2:
+            # Show both layers
+            self.ax_2d.set_title(f"Iso Mode: {self.iso_layers[0]} & {self.iso_layers[1]}")
             
-            # Selected points
-            for idx in self.selected_points:
-                if idx < len(points):
-                    self.ax_2d.plot(points[idx][0], points[idx][1], 'go', markersize=12, alpha=0.5)
+            colors = ['red', 'blue']
+            for i, layer in enumerate(self.iso_layers):
+                points = self.mesh_data.points[layer]
+                
+                # Draw connections
+                for conn in self.mesh_data.connections[layer]:
+                    p1, p2 = points[conn[0]], points[conn[1]]
+                    self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 
+                                   color=colors[i], linewidth=1.5, alpha=0.7)
+                
+                # Draw points
+                if points:
+                    xs, ys = zip(*points)
+                    self.ax_2d.plot(xs, ys, 'o', color=colors[i], markersize=8, 
+                                   label=f"{layer}")
+            
+            # Draw inter-layer connections
+            for layer1, idx1, layer2, idx2 in self.mesh_data.inter_layer_connections:
+                if layer1 in self.iso_layers and layer2 in self.iso_layers:
+                    p1 = self.mesh_data.points[layer1][idx1]
+                    p2 = self.mesh_data.points[layer2][idx2]
+                    self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 
+                                   'g--', linewidth=2, alpha=0.5)
+            
+            self.ax_2d.legend()
+        else:
+            # Single layer view
+            layer = self.mesh_data.current_layer
+            z = self.mesh_data.layers[layer]
+            self.ax_2d.set_title(f"Layer: {layer} (z={z})")
+            
+            # Grid lines
+            for i in range(-10, 11, max(1, 20 // subdivs)):
+                self.ax_2d.axhline(y=i, color='gray', alpha=0.2, linewidth=0.5)
+                self.ax_2d.axvline(x=i, color='gray', alpha=0.2, linewidth=0.5)
+            
+            # Connections
+            points = self.mesh_data.points[layer]
+            for conn in self.mesh_data.connections[layer]:
+                p1, p2 = points[conn[0]], points[conn[1]]
+                self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'b-', linewidth=1.5)
+            
+            # Points
+            if points:
+                xs, ys = zip(*points)
+                self.ax_2d.plot(xs, ys, 'ro', markersize=8)
+                
+                # Selected points
+                for idx in self.selected_points:
+                    if isinstance(idx, int) and idx < len(points):
+                        self.ax_2d.plot(points[idx][0], points[idx][1], 'go', 
+                                       markersize=12, alpha=0.5)
         
         self.canvas_2d.draw()
         
@@ -364,26 +465,64 @@ class MeshBuilderApp:
             
     def on_layer_select(self, event):
         sel = self.layer_listbox.curselection()
-        if sel:
-            text = self.layer_listbox.get(sel[0])
-            name = text.split(" (z=")[0]
-            self.mesh_data.current_layer = name
-            self.layer_info.config(text=f"Current: {name}")
-            self.clear_selection()
-            self.update_2d_plot()
+        
+        if self.iso_mode:
+            # In iso mode, allow selecting 2 layers
+            if len(sel) <= 2:
+                self.iso_layers = []
+                for idx in sel:
+                    text = self.layer_listbox.get(idx)
+                    name = text.split(" (z=")[0]
+                    self.iso_layers.append(name)
+                
+                if len(self.iso_layers) == 2:
+                    self.iso_label.config(text=f"Linking: {self.iso_layers[0]} ↔ {self.iso_layers[1]}", 
+                                         fg="green")
+                self.update_2d_plot()
+        else:
+            # Normal mode - single selection
+            if sel:
+                text = self.layer_listbox.get(sel[0])
+                name = text.split(" (z=")[0]
+                self.mesh_data.current_layer = name
+                self.layer_info.config(text=f"Current: {name}")
+                self.clear_selection()
+                self.update_2d_plot()
             
     def add_layer(self):
         num = len(self.mesh_data.layers)
-        name = tk.simpledialog.askstring("Layer Name", f"Name for new layer:", 
+        name = simpledialog.askstring("Layer Name", f"Name for new layer:", 
                                         initialvalue=f"Layer {num}")
         if not name:
             return
         
-        z = tk.simpledialog.askfloat("Z Value", f"Z-value for {name}:", 
+        z = simpledialog.askfloat("Z Value", f"Z-value for {name}:", 
                                     initialvalue=float(num))
         if z is not None:
             self.mesh_data.add_layer(name, z)
             self.update_layer_list()
+    
+    def duplicate_layer(self):
+        """Duplicate the current layer"""
+        current = self.mesh_data.current_layer
+        num = len(self.mesh_data.layers)
+        
+        name = simpledialog.askstring("Duplicate Layer", 
+                                     f"Name for duplicated layer:", 
+                                     initialvalue=f"{current}_copy")
+        if not name:
+            return
+        
+        current_z = self.mesh_data.layers[current]
+        z = simpledialog.askfloat("Z Value", f"Z-value for {name}:", 
+                                 initialvalue=current_z + 1.0)
+        if z is not None:
+            self.mesh_data.add_layer(name, z)
+            # Copy points and connections
+            self.mesh_data.points[name] = self.mesh_data.points[current].copy()
+            self.mesh_data.connections[name] = self.mesh_data.connections[current].copy()
+            self.update_layer_list()
+            messagebox.showinfo("Success", f"Layer duplicated: {name}")
             
     def remove_layer(self):
         if len(self.mesh_data.layers) <= 1:
@@ -397,6 +536,7 @@ class MeshBuilderApp:
         
     # 3D View functions
     def update_3d_view(self):
+        self.viewer_3d.mesh_data = self.mesh_data  # Ensure reference is updated
         self.viewer_3d.update_view()
         self.canvas_3d.draw()
         

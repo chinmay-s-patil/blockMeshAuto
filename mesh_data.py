@@ -8,6 +8,7 @@ class MeshData:
         self.current_layer = "Layer 0"
         self.points = {"Layer 0": []}
         self.connections = {"Layer 0": []}
+        self.inter_layer_connections = []  # [(layer1, idx1, layer2, idx2)]
         self.patches = []  # [(name, patch_type, face_indices)]
         
     def add_layer(self, name, z_value):
@@ -45,6 +46,12 @@ class MeshData:
         conn = tuple(sorted([idx1, idx2]))
         if conn not in self.connections[layer]:
             self.connections[layer].append(conn)
+    
+    def add_inter_layer_connection(self, layer1, idx1, layer2, idx2):
+        """Add a connection between points on different layers"""
+        conn = (layer1, idx1, layer2, idx2)
+        if conn not in self.inter_layer_connections:
+            self.inter_layer_connections.append(conn)
             
     def get_all_3d_points(self):
         """Get all points with their 3D coordinates"""

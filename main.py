@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 import numpy as np
+import json
+import os
 
 from mesh_data import MeshData
 from blockmesh_export import BlockMeshExporter
@@ -20,11 +22,37 @@ class MeshBuilderApp:
         self.mode = "select"  # "add", "delete", or "select"
         self.iso_mode = False
         self.iso_layers = []  # For linking between layers
+        self.face_selection_mode = False  # Toggle for 3D face selection
+        self.temp_json_file = "mesh_temp.json"
         
+        self.setup_top_bar()
         self.setup_notebook()
         self.setup_2d_view()
         self.setup_3d_view()
         self.setup_patch_view()
+        
+        # Auto-save periodically
+        self.auto_save()
+        
+    def setup_top_bar(self):
+        """Create top bar with save/load buttons"""
+        top_frame = tk.Frame(self.root, bg="lightgray", height=50)
+        top_frame.pack(side=tk.TOP, fill=tk.X)
+        top_frame.pack_propagate(False)
+        
+        tk.Label(top_frame, text="OpenFOAM Mesh Builder", 
+                font=("Arial", 14, "bold"), bg="lightgray").pack(side=tk.LEFT, padx=10)
+        
+        # Right side buttons
+        button_frame = tk.Frame(top_frame, bg="lightgray")
+        button_frame.pack(side=tk.RIGHT, padx=10)
+        
+        tk.Button(button_frame, text="💾 Save", command=self.save_to_json,
+                 bg="lightgreen", font=("Arial", 10, "bold"), width=8).pack(side=tk.LEFT, padx=2)
+        tk.Button(button_frame, text="📂 Load", command=self.load_from_json,
+                 bg="lightblue", font=("Arial", 10, "bold"), width=8).pack(side=tk.LEFT, padx=2)
+        tk.Button(button_frame, text="🔄 New", command=self.new_project,
+                 bg="lightyellow", font=("Arial", 10, "bold"), width=8).pack(side=tk.LEFT, padx=2)
         
     def setup_notebook(self):
         """Create tabbed interface for different sections"""
@@ -191,6 +219,20 @@ class MeshBuilderApp:
         tk.Button(right_frame, text="🔄 Update 3D View", command=self.update_3d_view,
                  bg="lightgreen", font=("Arial", 11, "bold")).pack(fill=tk.X, padx=5, pady=5)
         
+        # Face selection mode toggle
+        mode_frame = tk.LabelFrame(right_frame, text="Selection Mode", padx=10, pady=10)
+        mode_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        self.face_sel_mode_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(mode_frame, text="Enable Face Selection", 
+                      variable=self.face_sel_mode_var, 
+                      command=self.toggle_face_selection_mode,
+                      font=("Arial", 10, "bold")).pack()
+        
+        self.face_mode_label = tk.Label(mode_frame, text="Face selection disabled", 
+                                        font=("Arial", 9), fg="gray")
+        self.face_mode_label.pack(pady=5)
+        
         # Face selection info
         info_frame = tk.LabelFrame(right_frame, text="Face Selection", padx=10, pady=10)
         info_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -334,20 +376,29 @@ class MeshBuilderApp:
     def handle_iso_click(self, x, y):
         """Handle clicks in iso mode for inter-layer connections"""
         # Find which layer the click is closest to
+        min_dist = float('inf')
+        closest_point = None
+        
         for layer in self.iso_layers:
             points = self.mesh_data.points[layer]
             for idx, (px, py) in enumerate(points):
                 dist = np.sqrt((px - x)**2 + (py - y)**2)
-                if dist < 0.5:
-                    # Add to selection with layer info
-                    point_ref = (layer, idx)
-                    if point_ref not in self.selected_points:
-                        self.selected_points.append(point_ref)
-                        if len(self.selected_points) > 2:
-                            self.selected_points.pop(0)
-                    self.selection_label.config(text=f"Selected: {self.selected_points}")
-                    self.update_2d_plot()
-                    return
+                if dist < min_dist and dist < 0.5:
+                    min_dist = dist
+                    closest_point = (layer, idx)
+        
+        if closest_point:
+            # Add to selection with layer info
+            if closest_point not in self.selected_points:
+                self.selected_points.append(closest_point)
+                if len(self.selected_points) > 2:
+                    self.selected_points.pop(0)
+            else:
+                # Deselect if clicking same point
+                self.selected_points.remove(closest_point)
+            
+            self.selection_label.config(text=f"Selected: {self.selected_points}")
+            self.update_2d_plot()
         
     def add_point_manual(self):
         try:
@@ -366,21 +417,31 @@ class MeshBuilderApp:
             return
         
         # Check if iso mode connection (between layers)
-        if self.iso_mode and isinstance(self.selected_points[0], tuple):
+        if isinstance(self.selected_points[0], tuple) and isinstance(self.selected_points[1], tuple):
             layer1, idx1 = self.selected_points[0]
             layer2, idx2 = self.selected_points[1]
+            
             if layer1 != layer2:
                 # Add inter-layer connection
                 self.mesh_data.add_inter_layer_connection(layer1, idx1, layer2, idx2)
-                messagebox.showinfo("Success", f"Connected {layer1}[{idx1}] to {layer2}[{idx2}]")
+                messagebox.showinfo("Success", f"Inter-layer connection created:\n{layer1}[{idx1}] ↔ {layer2}[{idx2}]")
+            else:
+                # Same layer connection in iso mode
+                self.mesh_data.add_connection(layer1, idx1, idx2)
+                messagebox.showinfo("Success", f"Connection created in {layer1}")
         else:
-            # Same layer connection
+            # Regular same layer connection
+            if not isinstance(self.selected_points[0], int) or not isinstance(self.selected_points[1], int):
+                messagebox.showerror("Error", "Invalid point selection. Exit ISO mode for regular connections.")
+                return
+            
             self.mesh_data.add_connection(self.mesh_data.current_layer, 
                                          self.selected_points[0], 
                                          self.selected_points[1])
         
         self.clear_selection()
         self.update_2d_plot()
+        self.update_3d_view()
         
     def clear_selection(self):
         self.selected_points = []
@@ -417,14 +478,24 @@ class MeshBuilderApp:
                     xs, ys = zip(*points)
                     self.ax_2d.plot(xs, ys, 'o', color=colors[i], markersize=8, 
                                    label=f"{layer}")
+                    
+                    # Highlight selected points from this layer
+                    for selected in self.selected_points:
+                        if isinstance(selected, tuple) and selected[0] == layer:
+                            idx = selected[1]
+                            if idx < len(points):
+                                self.ax_2d.plot(points[idx][0], points[idx][1], 'go', 
+                                              markersize=15, alpha=0.6, markeredgewidth=2,
+                                              markeredgecolor='green')
             
             # Draw inter-layer connections
             for layer1, idx1, layer2, idx2 in self.mesh_data.inter_layer_connections:
                 if layer1 in self.iso_layers and layer2 in self.iso_layers:
-                    p1 = self.mesh_data.points[layer1][idx1]
-                    p2 = self.mesh_data.points[layer2][idx2]
-                    self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 
-                                   'g--', linewidth=2, alpha=0.5)
+                    if idx1 < len(self.mesh_data.points[layer1]) and idx2 < len(self.mesh_data.points[layer2]):
+                        p1 = self.mesh_data.points[layer1][idx1]
+                        p2 = self.mesh_data.points[layer2][idx2]
+                        self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 
+                                       'g--', linewidth=2, alpha=0.5)
             
             self.ax_2d.legend()
         else:
@@ -539,9 +610,20 @@ class MeshBuilderApp:
         self.viewer_3d.mesh_data = self.mesh_data  # Ensure reference is updated
         self.viewer_3d.update_view()
         self.canvas_3d.draw()
+    
+    def toggle_face_selection_mode(self):
+        """Toggle face selection mode in 3D view"""
+        self.face_selection_mode = self.face_sel_mode_var.get()
+        if self.face_selection_mode:
+            self.face_mode_label.config(text="Face selection enabled - Click faces!", fg="green")
+        else:
+            self.face_mode_label.config(text="Face selection disabled", fg="gray")
         
     def on_3d_click(self, event):
         if event.inaxes != self.viewer_3d.ax:
+            return
+        
+        if not self.face_selection_mode:
             return
         
         face_idx = self.viewer_3d.pick_face(event.xdata, event.ydata)
@@ -595,6 +677,81 @@ class MeshBuilderApp:
             exporter = BlockMeshExporter(self.mesh_data)
             exporter.save_to_file(filename)
             messagebox.showinfo("Success", f"Saved to {filename}")
+    
+    # JSON Save/Load functions
+    def save_to_json(self):
+        """Save mesh data to JSON file"""
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialfile="mesh_project.json"
+        )
+        
+        if filename:
+            try:
+                data = self.mesh_data.to_dict()
+                with open(filename, 'w') as f:
+                    json.dump(data, f, indent=2)
+                messagebox.showinfo("Success", f"Project saved to {filename}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save: {str(e)}")
+    
+    def load_from_json(self):
+        """Load mesh data from JSON file"""
+        filename = filedialog.askopenfilename(
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        
+        if filename:
+            try:
+                with open(filename, 'r') as f:
+                    data = json.load(f)
+                self.mesh_data.from_dict(data)
+                
+                # Update UI
+                self.update_layer_list()
+                self.update_2d_plot()
+                self.update_3d_view()
+                
+                messagebox.showinfo("Success", f"Project loaded from {filename}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to load: {str(e)}")
+    
+    def auto_save(self):
+        """Auto-save to temporary file"""
+        try:
+            data = self.mesh_data.to_dict()
+            with open(self.temp_json_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except:
+            pass  # Silent fail for auto-save
+        
+        # Schedule next auto-save in 30 seconds
+        self.root.after(30000, self.auto_save)
+    
+    def new_project(self):
+        """Start a new project"""
+        result = messagebox.askyesnocancel("New Project", 
+                                          "Do you want to save the current project before starting a new one?")
+        if result is None:  # Cancel
+            return
+        elif result:  # Yes - save first
+            self.save_to_json()
+        
+        # Reset mesh data
+        self.mesh_data = MeshData()
+        self.selected_points = []
+        self.iso_layers = []
+        self.iso_mode = False
+        self.iso_mode_var.set(False)
+        
+        # Update UI
+        self.update_layer_list()
+        self.update_2d_plot()
+        self.update_3d_view()
+        self.clear_face_selection()
+        
+        messagebox.showinfo("New Project", "Started a new project")
 
 if __name__ == "__main__":
     root = tk.Tk()

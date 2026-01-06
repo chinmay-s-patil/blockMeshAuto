@@ -96,3 +96,23 @@ class MeshData:
             self.points[layer] = []
             self.connections[layer] = []
         self.patches = []
+    
+    def to_dict(self):
+        """Convert mesh data to dictionary for JSON serialization"""
+        return {
+            "layers": self.layers,
+            "current_layer": self.current_layer,
+            "points": self.points,
+            "connections": self.connections,
+            "inter_layer_connections": self.inter_layer_connections,
+            "patches": self.patches
+        }
+    
+    def from_dict(self, data):
+        """Load mesh data from dictionary"""
+        self.layers = data.get("layers", {"Layer 0": 0.0})
+        self.current_layer = data.get("current_layer", "Layer 0")
+        self.points = data.get("points", {"Layer 0": []})
+        self.connections = data.get("connections", {"Layer 0": []})
+        self.inter_layer_connections = data.get("inter_layer_connections", [])
+        self.patches = data.get("patches", [])

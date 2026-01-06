@@ -8,10 +8,11 @@ import json
 import os
 
 from mesh_data import MeshData
-from tab_2d_editor import Tab2DEditor
-from tab_grid_sizing import TabGridSizing
-from tab_3d_patches import Tab3DPatches
-from tab_export import TabExport
+from tab1_project_settings import TabProjectSettings
+from tab2_2d_editor import Tab2DEditor
+from tab3_grid_sizing import TabGridSizing
+from tab4_3d_patches import Tab3DPatches
+from tab5_export import TabExport
 
 
 class MeshBuilderApp:

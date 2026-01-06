@@ -1,7 +1,6 @@
 {
   "layers": {
-    "Layer 0": 0.0,
-    "Layer 0_copy": 1.0
+    "Layer 0": 0.0
   },
   "current_layer": "Layer 0",
   "points": {
@@ -15,36 +14,34 @@
         0.0
       ],
       [
-        5.0,
-        5.0
-      ],
-      [
         0.0,
         5.0
-      ]
-    ],
-    "Layer 0_copy": [
-      [
-        0.0,
-        0.0
       ],
       [
         5.0,
-        0.0
-      ],
-      [
-        5.0,
-        5.0
-      ],
-      [
-        0.0,
         5.0
       ]
     ]
   },
   "connections": {
-    "Layer 0": [],
-    "Layer 0_copy": []
+    "Layer 0": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        0,
+        2
+      ]
+    ]
   },
   "inter_layer_connections": [],
   "patches": []

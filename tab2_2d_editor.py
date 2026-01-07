@@ -55,7 +55,7 @@ class Tab2DEditor:
         mode_frame = tk.LabelFrame(parent, text="Mode", padx=10, pady=10)
         mode_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        self.select_btn = tk.Button(mode_frame, text="Select Points", 
+        self.select_btn = tk.Button(mode_frame, text="Select", 
                                      command=lambda: self.set_mode("select"), 
                                      relief=tk.SUNKEN, bg="lightblue")
         self.select_btn.pack(fill=tk.X, pady=2)
@@ -63,6 +63,10 @@ class Tab2DEditor:
         self.add_btn = tk.Button(mode_frame, text="Add Points", 
                                  command=lambda: self.set_mode("add"))
         self.add_btn.pack(fill=tk.X, pady=2)
+        
+        self.connect_btn = tk.Button(mode_frame, text="Connect", 
+                                     command=lambda: self.set_mode("connect"))
+        self.connect_btn.pack(fill=tk.X, pady=2)
         
         self.delete_btn = tk.Button(mode_frame, text="Delete Points", 
                                     command=lambda: self.set_mode("delete"))
@@ -134,14 +138,12 @@ class Tab2DEditor:
         tk.Button(manual_frame, text="Add Point", command=self.add_point_manual).pack(pady=5)
         
     def _setup_connection_controls(self, parent):
-        conn_frame = tk.LabelFrame(parent, text="Connections", padx=10, pady=10)
+        conn_frame = tk.LabelFrame(parent, text="Connection Tools", padx=10, pady=10)
         conn_frame.pack(fill=tk.X, padx=5, pady=5)
         
         self.selection_label = tk.Label(conn_frame, text="Selected: None", fg="green")
-        self.selection_label.pack()
+        self.selection_label.pack(pady=5)
         
-        tk.Button(conn_frame, text="Create Connection", 
-                 command=self.create_connection, bg="lightgreen").pack(fill=tk.X, pady=2)
         tk.Button(conn_frame, text="Delete Connection", 
                  command=self.delete_connection, bg="salmon").pack(fill=tk.X, pady=2)
         tk.Button(conn_frame, text="Clear Selection", 
@@ -152,6 +154,7 @@ class Tab2DEditor:
         
         self.select_btn.config(relief=tk.RAISED, bg="lightgray")
         self.add_btn.config(relief=tk.RAISED, bg="lightgray")
+        self.connect_btn.config(relief=tk.RAISED, bg="lightgray")
         self.delete_btn.config(relief=tk.RAISED, bg="lightgray")
         
         if mode == "select":
@@ -160,6 +163,9 @@ class Tab2DEditor:
         elif mode == "add":
             self.add_btn.config(relief=tk.SUNKEN, bg="lightgreen")
             self.mode_label.config(text="Current Mode: Add", fg="green")
+        elif mode == "connect":
+            self.connect_btn.config(relief=tk.SUNKEN, bg="lightyellow")
+            self.mode_label.config(text="Current Mode: Connect (click 2 points)", fg="orange")
         elif mode == "delete":
             self.delete_btn.config(relief=tk.SUNKEN, bg="salmon")
             self.mode_label.config(text="Current Mode: Delete", fg="red")
@@ -218,7 +224,7 @@ class Tab2DEditor:
         layer = self.mesh_data.current_layer
         points = self.mesh_data.points[layer]
         
-        # Check if clicking near a connection for deletion
+        # Check if clicking near a connection for deletion (in select mode only)
         if self.mode == "select":
             clicked_conn = self._find_connection_near_point(x, y, layer)
             if clicked_conn is not None:
@@ -241,6 +247,19 @@ class Tab2DEditor:
         elif self.mode == "add":
             if clicked_idx is None:
                 self.mesh_data.add_point(layer, x, y)
+        elif self.mode == "connect":
+            if clicked_idx is not None:
+                if clicked_idx not in self.selected_points:
+                    self.selected_points.append(clicked_idx)
+                    
+                    # Auto-connect when 2 points selected
+                    if len(self.selected_points) == 2:
+                        self.mesh_data.add_connection(layer, 
+                                                     self.selected_points[0], 
+                                                     self.selected_points[1])
+                        self.selected_points = []  # Clear selection after connecting
+                    
+                    self.selection_label.config(text=f"Selected: {self.selected_points}")
         elif self.mode == "select":
             if clicked_idx is not None:
                 if clicked_idx not in self.selected_points:
@@ -298,6 +317,19 @@ class Tab2DEditor:
         if closest_point:
             if closest_point not in self.selected_points:
                 self.selected_points.append(closest_point)
+                
+                # Auto-connect when 2 points selected in connect mode
+                if len(self.selected_points) == 2 and self.mode == "connect":
+                    layer1, idx1 = self.selected_points[0]
+                    layer2, idx2 = self.selected_points[1]
+                    
+                    if layer1 != layer2:
+                        self.mesh_data.add_inter_layer_connection(layer1, idx1, layer2, idx2)
+                    else:
+                        self.mesh_data.add_connection(layer1, idx1, idx2)
+                    
+                    self.selected_points = []  # Clear after connecting
+                
                 if len(self.selected_points) > 2:
                     self.selected_points.pop(0)
             else:
@@ -317,34 +349,6 @@ class Tab2DEditor:
         except ValueError:
             messagebox.showerror("Error", "Enter valid numbers")
     
-    def create_connection(self):
-        if len(self.selected_points) != 2:
-            messagebox.showwarning("Warning", "Select exactly 2 points")
-            return
-        
-        if isinstance(self.selected_points[0], tuple) and isinstance(self.selected_points[1], tuple):
-            layer1, idx1 = self.selected_points[0]
-            layer2, idx2 = self.selected_points[1]
-            
-            if layer1 != layer2:
-                self.mesh_data.add_inter_layer_connection(layer1, idx1, layer2, idx2)
-                messagebox.showinfo("Success", f"Inter-layer connection created:\n{layer1}[{idx1}] ↔ {layer2}[{idx2}]")
-            else:
-                self.mesh_data.add_connection(layer1, idx1, idx2)
-                messagebox.showinfo("Success", f"Connection created in {layer1}")
-        else:
-            if not isinstance(self.selected_points[0], int) or not isinstance(self.selected_points[1], int):
-                messagebox.showerror("Error", "Invalid point selection. Exit ISO mode for regular connections.")
-                return
-            
-            self.mesh_data.add_connection(self.mesh_data.current_layer, 
-                                         self.selected_points[0], 
-                                         self.selected_points[1])
-            messagebox.showinfo("Success", "Connection created")
-        
-        self.clear_selection()
-        self.update_plot()
-    
     def delete_connection(self):
         """Delete the selected connection"""
         if self.selected_connection is None:
@@ -354,7 +358,6 @@ class Tab2DEditor:
         layer, conn = self.selected_connection
         if conn in self.mesh_data.connections[layer]:
             self.mesh_data.connections[layer].remove(conn)
-            messagebox.showinfo("Success", f"Connection {conn} deleted from {layer}")
             self.selected_connection = None
             self.update_plot()
         else:

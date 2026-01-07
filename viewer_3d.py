@@ -1,57 +1,47 @@
 """
-3D visualization with rotation, zoom, and pan
+3D visualization using Plotly for better interactivity
 Supports different sketch planes with correct axis orientation
 """
 import numpy as np
-from matplotlib.figure import Figure
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
 
 class Viewer3D:
-    def __init__(self, figure, mesh_data):
-        self.fig = figure
+    def __init__(self, parent_widget, mesh_data):
+        self.parent = parent_widget
         self.mesh_data = mesh_data
-        self.ax = None
         self.selected_faces = set()
         self.face_patches = {}  # face_idx -> (name, type)
         self.pickable_faces = []
+        self.fig = None
         
-        self._init_3d_axis()
-        
-    def _init_3d_axis(self):
-        """Initialize 3D axis with correct labels based on sketch plane"""
-        self.fig.clear()
-        self.ax = self.fig.add_subplot(111, projection='3d')
-        self._set_axis_labels()
-        
-    def _set_axis_labels(self):
-        """Set axis labels based on sketch plane"""
+    def _get_axis_labels(self):
+        """Get axis labels based on sketch plane"""
         plane = self.mesh_data.sketch_plane
         
         if plane == "XY":
-            # Sketch on XY, extrude in Z
-            # 3D view: X(horizontal) - Z(depth/back-front) - Y(vertical)
-            self.ax.set_xlabel('X (horizontal)')
-            self.ax.set_ylabel('Z (depth)')
-            self.ax.set_zlabel('Y (vertical)')
+            return {
+                'x': 'X (horizontal)',
+                'y': 'Z (depth)',
+                'z': 'Y (vertical)'
+            }
         elif plane == "YZ":
-            # Sketch on YZ, extrude in X
-            # 3D view: Y(horizontal) - X(depth/back-front) - Z(vertical)
-            self.ax.set_xlabel('Y (horizontal)')
-            self.ax.set_ylabel('X (depth)')
-            self.ax.set_zlabel('Z (vertical)')
+            return {
+                'x': 'Y (horizontal)',
+                'y': 'X (depth)',
+                'z': 'Z (vertical)'
+            }
         elif plane == "ZX":
-            # Sketch on ZX, extrude in Y
-            # 3D view: Z(horizontal) - Y(depth/back-front) - X(vertical)
-            self.ax.set_xlabel('Z (horizontal)')
-            self.ax.set_ylabel('Y (depth)')
-            self.ax.set_zlabel('X (vertical)')
+            return {
+                'x': 'Z (horizontal)',
+                'y': 'Y (depth)',
+                'z': 'X (vertical)'
+            }
+        return {'x': 'X', 'y': 'Y', 'z': 'Z'}
         
     def update_view(self):
-        """Update the 3D visualization"""
-        self.ax.clear()
-        self._set_axis_labels()
-        
+        """Update the 3D visualization using Plotly"""
         # Get all points with their 3D coordinates
         all_points = []
         for layer in sorted(self.mesh_data.layers.keys(), key=lambda l: self.mesh_data.layers[l]):
@@ -60,16 +50,31 @@ class Viewer3D:
                 all_points.append(coords_3d)
         
         if not all_points:
-            self.ax.text(0, 0, 0, "No points to display\nAdd points in Tab 2", 
-                        ha='center', va='center', fontsize=12)
-            return
+            # Create empty figure with message
+            self.fig = go.Figure()
+            self.fig.add_annotation(
+                text="No points to display<br>Add points in Tab 2",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, showarrow=False,
+                font=dict(size=16)
+            )
+            return self.fig
+        
+        # Create figure
+        self.fig = go.Figure()
         
         # Plot all points
         xs, ys, zs = zip(*all_points)
-        self.ax.scatter(xs, ys, zs, c='red', marker='o', s=50, alpha=0.8)
+        self.fig.add_trace(go.Scatter3d(
+            x=xs, y=ys, z=zs,
+            mode='markers',
+            marker=dict(size=6, color='red', opacity=0.8),
+            name='Points',
+            hoverinfo='text',
+            text=[f'Point {i}' for i in range(len(xs))]
+        ))
         
         # Plot connections within each layer (horizontal edges)
-        point_idx = 0
         for layer in sorted(self.mesh_data.layers.keys(), key=lambda l: self.mesh_data.layers[l]):
             points_2d = self.mesh_data.points[layer]
             
@@ -78,10 +83,17 @@ class Viewer3D:
                     p1_3d = self.mesh_data.get_3d_coords(layer, points_2d[conn[0]])
                     p2_3d = self.mesh_data.get_3d_coords(layer, points_2d[conn[1]])
                     
-                    self.ax.plot([p1_3d[0], p2_3d[0]], 
-                               [p1_3d[1], p2_3d[1]], 
-                               [p1_3d[2], p2_3d[2]], 
-                               'b-', linewidth=2, alpha=0.6)
+                    self.fig.add_trace(go.Scatter3d(
+                        x=[p1_3d[0], p2_3d[0]],
+                        y=[p1_3d[1], p2_3d[1]],
+                        z=[p1_3d[2], p2_3d[2]],
+                        mode='lines',
+                        line=dict(color='blue', width=4),
+                        name=f'{layer} conn',
+                        showlegend=False,
+                        hoverinfo='text',
+                        text=f'{layer}: {conn[0]}-{conn[1]}'
+                    ))
         
         # Plot inter-layer connections (vertical edges)
         for layer1, idx1, layer2, idx2 in self.mesh_data.inter_layer_connections:
@@ -89,12 +101,19 @@ class Viewer3D:
                 p1_3d = self.mesh_data.get_3d_coords(layer1, self.mesh_data.points[layer1][idx1])
                 p2_3d = self.mesh_data.get_3d_coords(layer2, self.mesh_data.points[layer2][idx2])
                 
-                self.ax.plot([p1_3d[0], p2_3d[0]], 
-                           [p1_3d[1], p2_3d[1]], 
-                           [p1_3d[2], p2_3d[2]], 
-                           'g--', linewidth=2, alpha=0.7)
+                self.fig.add_trace(go.Scatter3d(
+                    x=[p1_3d[0], p2_3d[0]],
+                    y=[p1_3d[1], p2_3d[1]],
+                    z=[p1_3d[2], p2_3d[2]],
+                    mode='lines',
+                    line=dict(color='green', width=4, dash='dash'),
+                    name='Inter-layer',
+                    showlegend=False,
+                    hoverinfo='text',
+                    text=f'{layer1}[{idx1}] ↔ {layer2}[{idx2}]'
+                ))
         
-        # Auto-connect corresponding points between adjacent layers (if same number of points)
+        # Auto-connect corresponding points between adjacent layers
         layers_sorted = sorted(self.mesh_data.layers.keys(), key=lambda l: self.mesh_data.layers[l])
         for i in range(len(layers_sorted) - 1):
             layer1 = layers_sorted[i]
@@ -103,45 +122,52 @@ class Viewer3D:
             points1 = self.mesh_data.points[layer1]
             points2 = self.mesh_data.points[layer2]
             
-            # Connect corresponding points if same count
             if len(points1) == len(points2):
                 for j in range(len(points1)):
-                    p1_3d = self.mesh_data.get_3d_coords(layer1, points1[j])
-                    p2_3d = self.mesh_data.get_3d_coords(layer2, points2[j])
+                    # Check if already explicit
+                    already_explicit = any(
+                        (l1 == layer1 and i1 == j and l2 == layer2 and i2 == j) or
+                        (l1 == layer2 and i1 == j and l2 == layer1 and i2 == j)
+                        for l1, i1, l2, i2 in self.mesh_data.inter_layer_connections
+                    )
                     
-                    self.ax.plot([p1_3d[0], p2_3d[0]], 
-                               [p1_3d[1], p2_3d[1]], 
-                               [p1_3d[2], p2_3d[2]], 
-                               'gray', linewidth=1, alpha=0.3, linestyle=':')
+                    if not already_explicit:
+                        p1_3d = self.mesh_data.get_3d_coords(layer1, points1[j])
+                        p2_3d = self.mesh_data.get_3d_coords(layer2, points2[j])
+                        
+                        self.fig.add_trace(go.Scatter3d(
+                            x=[p1_3d[0], p2_3d[0]],
+                            y=[p1_3d[1], p2_3d[1]],
+                            z=[p1_3d[2], p2_3d[2]],
+                            mode='lines',
+                            line=dict(color='gray', width=2, dash='dot'),
+                            name='Auto-connect',
+                            showlegend=False,
+                            opacity=0.3,
+                            hoverinfo='text',
+                            text=f'{layer1}[{j}] → {layer2}[{j}] (auto)'
+                        ))
         
-        # Draw faces (quads) for patch selection
+        # Draw faces for patch selection
         self._draw_faces()
         
-        # Set axis limits with some margin
-        if xs and ys and zs:
-            margin = 2
-            x_range = max(xs) - min(xs)
-            y_range = max(ys) - min(ys)
-            z_range = max(zs) - min(zs)
-            
-            # Ensure minimum range
-            x_range = max(x_range, 2)
-            y_range = max(y_range, 2)
-            z_range = max(z_range, 2)
-            
-            self.ax.set_xlim(min(xs) - margin, max(xs) + margin)
-            self.ax.set_ylim(min(ys) - margin, max(ys) + margin)
-            self.ax.set_zlim(min(zs) - margin, max(zs) + margin)
-            
-            # Equal aspect ratio
-            max_range = max(x_range, y_range, z_range)
-            mid_x = (max(xs) + min(xs)) / 2
-            mid_y = (max(ys) + min(ys)) / 2
-            mid_z = (max(zs) + min(zs)) / 2
-            
-            self.ax.set_xlim(mid_x - max_range/2 - margin, mid_x + max_range/2 + margin)
-            self.ax.set_ylim(mid_y - max_range/2 - margin, mid_y + max_range/2 + margin)
-            self.ax.set_zlim(mid_z - max_range/2 - margin, mid_z + max_range/2 + margin)
+        # Get axis labels
+        labels = self._get_axis_labels()
+        
+        # Update layout
+        self.fig.update_layout(
+            scene=dict(
+                xaxis_title=labels['x'],
+                yaxis_title=labels['y'],
+                zaxis_title=labels['z'],
+                aspectmode='data'
+            ),
+            margin=dict(l=0, r=0, t=30, b=0),
+            hovermode='closest',
+            showlegend=True
+        )
+        
+        return self.fig
     
     def _draw_faces(self):
         """Draw mesh faces as polygons"""
@@ -152,38 +178,42 @@ class Viewer3D:
         # Horizontal faces within each layer
         for layer in layers_sorted:
             points_2d = self.mesh_data.points[layer]
-            conns = self.mesh_data.connections[layer]
             
-            # Try to detect quad faces from connections
-            if len(points_2d) >= 4 and len(conns) >= 4:
-                # Simple quad detection: assume first 4 points form a quad
-                # In a real implementation, you'd detect cycles in the connection graph
-                if len(points_2d) >= 4:
-                    # Try different quad combinations
-                    quads_to_try = [
-                        [0, 1, 2, 3],
-                        [0, 1, 3, 2],  # Different winding
+            if len(points_2d) >= 4:
+                quad_indices = [0, 1, 2, 3]
+                
+                if all(idx < len(points_2d) for idx in quad_indices):
+                    face_verts = [
+                        self.mesh_data.get_3d_coords(layer, points_2d[quad_indices[0]]),
+                        self.mesh_data.get_3d_coords(layer, points_2d[quad_indices[1]]),
+                        self.mesh_data.get_3d_coords(layer, points_2d[quad_indices[2]]),
+                        self.mesh_data.get_3d_coords(layer, points_2d[quad_indices[3]])
                     ]
                     
-                    for quad_indices in quads_to_try:
-                        if all(idx < len(points_2d) for idx in quad_indices):
-                            face_verts = [
-                                self.mesh_data.get_3d_coords(layer, points_2d[quad_indices[0]]),
-                                self.mesh_data.get_3d_coords(layer, points_2d[quad_indices[1]]),
-                                self.mesh_data.get_3d_coords(layer, points_2d[quad_indices[2]]),
-                                self.mesh_data.get_3d_coords(layer, points_2d[quad_indices[3]])
-                            ]
-                            
-                            self.pickable_faces.append(face_verts)
-                            face_idx = len(self.pickable_faces) - 1
-                            
-                            color = 'cyan' if face_idx in self.selected_faces else 'lightblue'
-                            alpha = 0.7 if face_idx in self.selected_faces else 0.2
-                            
-                            poly = Poly3DCollection([face_verts], alpha=alpha, 
-                                                   facecolor=color, edgecolor='black', linewidth=1)
-                            self.ax.add_collection3d(poly)
-                            break  # Only add one quad per layer for now
+                    self.pickable_faces.append(face_verts)
+                    face_idx = len(self.pickable_faces) - 1
+                    
+                    xs = [v[0] for v in face_verts] + [face_verts[0][0]]
+                    ys = [v[1] for v in face_verts] + [face_verts[0][1]]
+                    zs = [v[2] for v in face_verts] + [face_verts[0][2]]
+                    
+                    color = 'cyan' if face_idx in self.selected_faces else 'lightblue'
+                    opacity = 0.7 if face_idx in self.selected_faces else 0.2
+                    
+                    self.fig.add_trace(go.Mesh3d(
+                        x=[v[0] for v in face_verts],
+                        y=[v[1] for v in face_verts],
+                        z=[v[2] for v in face_verts],
+                        i=[0, 0],
+                        j=[1, 2],
+                        k=[2, 3],
+                        color=color,
+                        opacity=opacity,
+                        name=f'Face {face_idx}',
+                        showlegend=False,
+                        hoverinfo='text',
+                        text=f'Face {face_idx}: {layer}'
+                    ))
         
         # Vertical faces between layers
         for i in range(len(layers_sorted) - 1):
@@ -193,19 +223,19 @@ class Viewer3D:
             points1 = self.mesh_data.points[layer1]
             points2 = self.mesh_data.points[layer2]
             
-            # Create vertical quads between corresponding edges
             num_points = min(len(points1), len(points2))
             if num_points >= 2:
-                for j in range(num_points - 1):
-                    # Check if there's a connection between j and j+1 in layer1
-                    conn_exists = (j, j+1) in self.mesh_data.connections[layer1] or \
-                                 (j+1, j) in self.mesh_data.connections[layer1]
+                for j in range(num_points):
+                    next_j = (j + 1) % num_points
+                    
+                    conn_exists = (j, next_j) in self.mesh_data.connections[layer1] or \
+                                 (next_j, j) in self.mesh_data.connections[layer1]
                     
                     if conn_exists or len(points1) == len(points2):
                         face_verts = [
                             self.mesh_data.get_3d_coords(layer1, points1[j]),
-                            self.mesh_data.get_3d_coords(layer1, points1[j+1]),
-                            self.mesh_data.get_3d_coords(layer2, points2[j+1]),
+                            self.mesh_data.get_3d_coords(layer1, points1[next_j]),
+                            self.mesh_data.get_3d_coords(layer2, points2[next_j]),
                             self.mesh_data.get_3d_coords(layer2, points2[j])
                         ]
                         
@@ -213,51 +243,30 @@ class Viewer3D:
                         face_idx = len(self.pickable_faces) - 1
                         
                         color = 'yellow' if face_idx in self.selected_faces else 'lightgreen'
-                        alpha = 0.7 if face_idx in self.selected_faces else 0.2
+                        opacity = 0.7 if face_idx in self.selected_faces else 0.2
                         
-                        poly = Poly3DCollection([face_verts], alpha=alpha,
-                                               facecolor=color, edgecolor='black', linewidth=1)
-                        self.ax.add_collection3d(poly)
-                
-                # Close the loop if it's a closed shape
-                if num_points >= 3:
-                    conn_exists = (num_points-1, 0) in self.mesh_data.connections[layer1] or \
-                                 (0, num_points-1) in self.mesh_data.connections[layer1]
-                    
-                    if conn_exists or len(points1) == len(points2):
-                        face_verts = [
-                            self.mesh_data.get_3d_coords(layer1, points1[num_points-1]),
-                            self.mesh_data.get_3d_coords(layer1, points1[0]),
-                            self.mesh_data.get_3d_coords(layer2, points2[0]),
-                            self.mesh_data.get_3d_coords(layer2, points2[num_points-1])
-                        ]
-                        
-                        self.pickable_faces.append(face_verts)
-                        face_idx = len(self.pickable_faces) - 1
-                        
-                        color = 'yellow' if face_idx in self.selected_faces else 'lightgreen'
-                        alpha = 0.7 if face_idx in self.selected_faces else 0.2
-                        
-                        poly = Poly3DCollection([face_verts], alpha=alpha,
-                                               facecolor=color, edgecolor='black', linewidth=1)
-                        self.ax.add_collection3d(poly)
+                        self.fig.add_trace(go.Mesh3d(
+                            x=[v[0] for v in face_verts],
+                            y=[v[1] for v in face_verts],
+                            z=[v[2] for v in face_verts],
+                            i=[0, 0],
+                            j=[1, 2],
+                            k=[2, 3],
+                            color=color,
+                            opacity=opacity,
+                            name=f'Face {face_idx}',
+                            showlegend=False,
+                            hoverinfo='text',
+                            text=f'Face {face_idx}: {layer1}-{layer2} [{j}-{next_j}]'
+                        ))
     
-    def pick_face(self, x, y):
-        """Pick a face based on mouse click (simplified)"""
-        # Simplified face picking - cycles through faces
-        if self.pickable_faces:
-            # Get next unselected face, or toggle first selected
-            for i in range(len(self.pickable_faces)):
-                if i not in self.selected_faces:
-                    self.selected_faces.add(i)
-                    return i
-            
-            # All selected, so deselect first
-            if self.selected_faces:
-                first = min(self.selected_faces)
-                self.selected_faces.remove(first)
-                return first
-        return None
+    def pick_face(self, face_idx):
+        """Toggle face selection"""
+        if face_idx in self.selected_faces:
+            self.selected_faces.remove(face_idx)
+        else:
+            self.selected_faces.add(face_idx)
+        return face_idx
     
     def clear_selection(self):
         """Clear all selected faces"""

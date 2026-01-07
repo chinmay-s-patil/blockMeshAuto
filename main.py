@@ -11,6 +11,7 @@ from mesh_data import MeshData
 from tab1_project_settings import TabProjectSettings
 from tab2_2d_editor import Tab2DEditor
 from tab3_grid_sizing import TabGridSizing
+from tab3_hex_creation import TabHexBlockMaking
 from tab4_3d_patches import Tab3DPatches
 from tab5_export import TabExport
 
@@ -75,7 +76,7 @@ class MeshBuilderApp:
         """Initialize all tab components"""
         self.project_settings = TabProjectSettings(self.tab_project, self.mesh_data)
         self.editor_2d = Tab2DEditor(self.tab_2d, self.mesh_data)
-        self.grid_sizing = TabGridSizing(self.tab_grid, self.mesh_data)
+        self.hex_blocks = TabHexBlockMaking(self.tab_grid, self.mesh_data)
         self.patches_3d = Tab3DPatches(self.tab_3d, self.mesh_data)
         self.export_tab = TabExport(self.tab_export, self.mesh_data)
     
@@ -166,7 +167,7 @@ class MeshBuilderApp:
         # Reset all tab components with new mesh data
         self.project_settings.mesh_data = self.mesh_data
         self.editor_2d.mesh_data = self.mesh_data
-        self.grid_sizing.mesh_data = self.mesh_data
+        self.hex_blocks.mesh_data = self.mesh_data
         self.patches_3d.mesh_data = self.mesh_data
         self.patches_3d.viewer_3d.mesh_data = self.mesh_data
         self.export_tab.mesh_data = self.mesh_data

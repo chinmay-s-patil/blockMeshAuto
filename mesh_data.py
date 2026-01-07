@@ -11,6 +11,11 @@ class MeshData:
         self.inter_layer_connections = []  # [(layer1, idx1, layer2, idx2)]
         self.patches = []  # [(name, patch_type, face_indices)]
         
+        # Project settings
+        self.sketch_plane = "XY"  # XY, YZ, or ZX
+        self.project_name = "Untitled Project"
+        self.project_description = ""
+        
     def add_layer(self, name, z_value):
         self.layers[name] = z_value
         self.points[name] = []
@@ -52,6 +57,23 @@ class MeshData:
         conn = (layer1, idx1, layer2, idx2)
         if conn not in self.inter_layer_connections:
             self.inter_layer_connections.append(conn)
+    
+    def get_3d_coords(self, layer, point_2d):
+        """Convert 2D sketch coords to 3D based on sketch plane"""
+        x, y = point_2d
+        z = self.layers[layer]
+        
+        if self.sketch_plane == "XY":
+            # X-horizontal, Y-vertical, Z-depth
+            return (x, z, y)  # Returns (X, Z, Y) for matplotlib
+        elif self.sketch_plane == "YZ":
+            # Y-horizontal, Z-vertical, X-depth
+            return (z, x, y)  # Returns (X=depth, Z=Y, Y=Z)
+        elif self.sketch_plane == "ZX":
+            # Z-horizontal, X-vertical, Y-depth
+            return (y, z, x)  # Returns (X=Z, Z=X, Y=depth)
+        
+        return (x, z, y)  # Default XY
             
     def get_all_3d_points(self):
         """Get all points with their 3D coordinates"""
@@ -60,9 +82,9 @@ class MeshData:
         
         global_idx = 0
         for layer in sorted(self.layers.keys(), key=lambda l: self.layers[l]):
-            z = self.layers[layer]
-            for local_idx, (x, y) in enumerate(self.points[layer]):
-                points_3d.append((x, y, z))
+            for local_idx, point_2d in enumerate(self.points[layer]):
+                coords_3d = self.get_3d_coords(layer, point_2d)
+                points_3d.append(coords_3d)
                 point_map[(layer, local_idx)] = global_idx
                 global_idx += 1
                 
@@ -92,9 +114,11 @@ class MeshData:
         self.patches.append((name, patch_type, face_indices))
         
     def clear_all(self):
+        """Clear all geometry while keeping project settings"""
         for layer in self.points:
             self.points[layer] = []
             self.connections[layer] = []
+        self.inter_layer_connections = []
         self.patches = []
     
     def to_dict(self):
@@ -105,7 +129,10 @@ class MeshData:
             "points": self.points,
             "connections": self.connections,
             "inter_layer_connections": self.inter_layer_connections,
-            "patches": self.patches
+            "patches": self.patches,
+            "sketch_plane": self.sketch_plane,
+            "project_name": self.project_name,
+            "project_description": self.project_description
         }
     
     def from_dict(self, data):
@@ -116,3 +143,6 @@ class MeshData:
         self.connections = data.get("connections", {"Layer 0": []})
         self.inter_layer_connections = data.get("inter_layer_connections", [])
         self.patches = data.get("patches", [])
+        self.sketch_plane = data.get("sketch_plane", "XY")
+        self.project_name = data.get("project_name", "Untitled Project")
+        self.project_description = data.get("project_description", "")

@@ -55,19 +55,22 @@ class MeshBuilderApp:
         self.notebook.pack(fill=tk.BOTH, expand=True)
         
         # Create tab frames
+        self.tab_project = tk.Frame(self.notebook)
         self.tab_2d = tk.Frame(self.notebook)
         self.tab_grid = tk.Frame(self.notebook)
         self.tab_3d = tk.Frame(self.notebook)
         self.tab_export = tk.Frame(self.notebook)
         
         # Add tabs to notebook
-        self.notebook.add(self.tab_2d, text="1. Points & Connections")
-        self.notebook.add(self.tab_grid, text="2. Grid Sizing")
-        self.notebook.add(self.tab_3d, text="3. 3D View & Patches")
-        self.notebook.add(self.tab_export, text="4. Export blockMeshDict")
+        self.notebook.add(self.tab_project, text="1. Project Settings")
+        self.notebook.add(self.tab_2d, text="2. Points & Connections")
+        self.notebook.add(self.tab_grid, text="3. Grid Sizing")
+        self.notebook.add(self.tab_3d, text="4. 3D View & Patches")
+        self.notebook.add(self.tab_export, text="5. Export blockMeshDict")
         
     def setup_tabs(self):
         """Initialize all tab components"""
+        self.project_settings = TabProjectSettings(self.tab_project, self.mesh_data)
         self.editor_2d = Tab2DEditor(self.tab_2d, self.mesh_data)
         self.grid_sizing = TabGridSizing(self.tab_grid, self.mesh_data)
         self.patches_3d = Tab3DPatches(self.tab_3d, self.mesh_data)
@@ -103,6 +106,7 @@ class MeshBuilderApp:
                 self.mesh_data.from_dict(data)
                 
                 # Update all tab views
+                self.project_settings.update_display()
                 self.editor_2d.update_layer_list()
                 self.editor_2d.update_iso_checkboxes()
                 self.editor_2d.update_plot()
@@ -137,6 +141,7 @@ class MeshBuilderApp:
         self.mesh_data = MeshData()
         
         # Reset all tab components with new mesh data
+        self.project_settings.mesh_data = self.mesh_data
         self.editor_2d.mesh_data = self.mesh_data
         self.grid_sizing.mesh_data = self.mesh_data
         self.patches_3d.mesh_data = self.mesh_data
@@ -144,6 +149,7 @@ class MeshBuilderApp:
         self.export_tab.mesh_data = self.mesh_data
         
         # Update all views
+        self.project_settings.update_display()
         self.editor_2d.selected_points = []
         self.editor_2d.iso_layers = []
         self.editor_2d.iso_mode = False

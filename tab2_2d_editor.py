@@ -332,8 +332,8 @@ class Tab2DEditor:
             self.ax_2d.set_xlim(center_x - max_range/2 - margin, center_x + max_range/2 + margin)
             self.ax_2d.set_ylim(center_y - max_range/2 - margin, center_y + max_range/2 + margin)
         else:
-            self.ax_2d.set_xlim(-1, 7)
-            self.ax_2d.set_ylim(-1, 7)
+            self.ax_2d.set_xlim(-1, 1)
+            self.ax_2d.set_ylim(-1, 1)
         
         if self.iso_mode and len(self.iso_layers) == 2:
             self.ax_2d.set_title(f"Iso Mode: {self.iso_layers[0]} & {self.iso_layers[1]}")

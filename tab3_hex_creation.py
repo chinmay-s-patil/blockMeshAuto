@@ -1,13 +1,11 @@
 """
 Hex Block Making Tab - Create hexahedral blocks with proper sizing and grading
-Uses matplotlib 3D for in-window visualization
+Uses tkinter Canvas for simple 3D visualization
 """
 import tkinter as tk
 from tkinter import messagebox, ttk
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.figure import Figure
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+import math
 
 
 class TabHexBlockMaking:
@@ -31,59 +29,259 @@ class TabHexBlockMaking:
         # Grading
         self.grading_type = tk.StringVar(value="simpleGrading")
         
+        # View angles for canvas
+        self.view_angle = 45
+        self.view_tilt = 30
+        
         self.setup_ui()
         
     def setup_ui(self):
-        main_frame = tk.Frame(self.parent)
+        # Main container with tabs
+        self.notebook = ttk.Notebook(self.parent)
+        self.notebook.pack(fill=tk.BOTH, expand=True)
+        
+        # Create sub-tabs
+        self.tab_selection = tk.Frame(self.notebook)
+        self.tab_sizing = tk.Frame(self.notebook)
+        self.tab_blocks = tk.Frame(self.notebook)
+        
+        self.notebook.add(self.tab_selection, text="1. Point Selection")
+        self.notebook.add(self.tab_sizing, text="2. Sizing & Grading")
+        self.notebook.add(self.tab_blocks, text="3. Manage Blocks")
+        
+        # Setup each tab
+        self._setup_selection_tab()
+        self._setup_sizing_tab()
+        self._setup_blocks_tab()
+    
+    def _setup_selection_tab(self):
+        main_frame = tk.Frame(self.tab_selection)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Left: 3D View
+        # Left: Canvas for 3D-ish view
         left_frame = tk.Frame(main_frame)
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         tk.Label(left_frame, text="3D Hex Block Builder", 
                 font=("Arial", 12, "bold")).pack(pady=5)
         
-        # Matplotlib 3D canvas
-        self.fig_3d = Figure(figsize=(8, 8))
-        self.ax_3d = self.fig_3d.add_subplot(111, projection='3d')
-        self.canvas_3d = FigureCanvasTkAgg(self.fig_3d, left_frame)
-        self.canvas_3d.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        # Simple canvas for drawing
+        self.canvas = tk.Canvas(left_frame, bg="white", width=600, height=600)
+        self.canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.canvas.bind("<Button-1>", self.on_canvas_click)
         
-        # Add toolbar for pan/zoom/rotate
-        toolbar = NavigationToolbar2Tk(self.canvas_3d, left_frame)
-        toolbar.update()
+        # Rotation controls
+        control_frame = tk.Frame(left_frame)
+        control_frame.pack(fill=tk.X, pady=5)
         
-        self.canvas_3d.mpl_connect('button_press_event', self.on_3d_click)
+        tk.Label(control_frame, text="Rotation:").pack(side=tk.LEFT, padx=5)
+        tk.Button(control_frame, text="↻ Rotate", 
+                 command=lambda: self.rotate_view(30)).pack(side=tk.LEFT, padx=2)
+        tk.Button(control_frame, text="🔄 Reset View", 
+                 command=self.reset_view).pack(side=tk.LEFT, padx=2)
         
         # Right: Controls
-        right_frame = tk.Frame(main_frame, width=400)
+        right_frame = tk.Frame(main_frame, width=350)
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(5, 0))
         right_frame.pack_propagate(False)
         
-        # Create scrollable frame for controls
-        canvas = tk.Canvas(right_frame)
-        scrollbar = tk.Scrollbar(right_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas)
+        # Layer selection
+        layer_frame = tk.LabelFrame(right_frame, text="1. Select 2 Layers", 
+                                    padx=10, pady=10, font=("Arial", 10, "bold"))
+        layer_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+        tk.Button(layer_frame, text="🔄 Refresh Layers", command=self.refresh_layers,
+                 bg="lightgreen", font=("Arial", 9, "bold")).pack(fill=tk.X, pady=(0, 5))
         
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        self.layer_listbox = tk.Listbox(layer_frame, height=6, selectmode=tk.EXTENDED)
+        self.layer_listbox.pack(fill=tk.X, pady=5)
+        self.layer_listbox.bind('<<ListboxSelect>>', self.on_layer_select)
         
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.layer_status = tk.Label(layer_frame, text="Select 2 layers", 
+                                     fg="gray", font=("Arial", 9, "italic"))
+        self.layer_status.pack(pady=5)
+        
+        # Point selection
+        point_frame = tk.LabelFrame(right_frame, text="2. Select 8 Points", 
+                                    padx=10, pady=10, font=("Arial", 10, "bold"))
+        point_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        tk.Label(point_frame, text="Click points in the view\n4 from each layer\nOrder: counter-clockwise",
+                font=("Arial", 8), justify=tk.LEFT, fg="gray").pack(pady=(0, 5))
+        
+        self.point_status = tk.Label(point_frame, text="Selected: 0/8 points", 
+                                     fg="blue", font=("Arial", 9, "bold"))
+        self.point_status.pack(pady=5)
+        
+        # List of selected points
+        point_scroll = tk.Scrollbar(point_frame)
+        point_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.point_list = tk.Listbox(point_frame, height=10, font=("Courier", 8),
+                                     yscrollcommand=point_scroll.set)
+        self.point_list.pack(fill=tk.BOTH, expand=True, pady=5)
+        point_scroll.config(command=self.point_list.yview)
+        
+        btn_frame = tk.Frame(point_frame)
+        btn_frame.pack(fill=tk.X, pady=5)
+        
+        tk.Button(btn_frame, text="Clear", command=self.clear_point_selection, 
+                 width=12).pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_frame, text="Next: Sizing →", command=lambda: self.notebook.select(1),
+                 bg="lightblue", font=("Arial", 9, "bold"), width=12).pack(side=tk.LEFT, padx=2)
+        
+        self.refresh_layers()
+    
+    def _setup_sizing_tab(self):
+        main_frame = tk.Frame(self.tab_sizing)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        tk.Label(main_frame, text="Sizing & Grading Configuration", 
+                font=("Arial", 14, "bold")).pack(pady=10)
+        
+        # Two columns
+        columns = tk.Frame(main_frame)
+        columns.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # Left: Sizing
+        left_col = tk.Frame(columns)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        sizing_frame = tk.LabelFrame(left_col, text="Cell Divisions", 
+                                     padx=15, pady=15, font=("Arial", 11, "bold"))
+        sizing_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Mode selection
+        tk.Label(sizing_frame, text="Sizing Mode:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
+        
+        tk.Radiobutton(sizing_frame, text="Universal (auto-calculate)", 
+                      variable=self.sizing_mode, value="universal",
+                      command=self.update_sizing_ui, font=("Arial", 9)).pack(anchor=tk.W)
+        
+        tk.Radiobutton(sizing_frame, text="2D Mesh (1 division in one direction)", 
+                      variable=self.sizing_mode, value="2d",
+                      command=self.update_sizing_ui, font=("Arial", 9)).pack(anchor=tk.W)
+        
+        tk.Radiobutton(sizing_frame, text="Custom (manual divisions)", 
+                      variable=self.sizing_mode, value="custom",
+                      command=self.update_sizing_ui, font=("Arial", 9)).pack(anchor=tk.W)
+        
+        # Universal mode
+        self.universal_frame = tk.Frame(sizing_frame)
+        self.universal_frame.pack(fill=tk.X, pady=10)
+        
+        tk.Label(self.universal_frame, text="Target cell size:", 
+                font=("Arial", 9)).pack(anchor=tk.W)
+        tk.Scale(self.universal_frame, from_=0.1, to=10.0, resolution=0.1,
+                variable=self.cell_size_var, orient=tk.HORIZONTAL).pack(fill=tk.X)
+        
+        # 2D mode
+        self.mode_2d_frame = tk.Frame(sizing_frame)
+        
+        tk.Label(self.mode_2d_frame, text="Target cell size:", 
+                font=("Arial", 9)).pack(anchor=tk.W)
+        tk.Scale(self.mode_2d_frame, from_=0.1, to=10.0, resolution=0.1,
+                variable=self.cell_size_var, orient=tk.HORIZONTAL).pack(fill=tk.X)
+        
+        tk.Label(self.mode_2d_frame, text="Single division direction:", 
+                font=("Arial", 9)).pack(anchor=tk.W, pady=(5, 0))
+        self.single_div_dir = tk.StringVar(value="Z")
+        dir_frame = tk.Frame(self.mode_2d_frame)
+        dir_frame.pack(anchor=tk.W, pady=5)
+        for direction in ["X", "Y", "Z"]:
+            tk.Radiobutton(dir_frame, text=direction, 
+                          variable=self.single_div_dir, value=direction).pack(side=tk.LEFT, padx=5)
+        
+        # Custom mode
+        self.custom_frame = tk.Frame(sizing_frame)
+        
+        for label, var in [("X divisions:", self.nx_var), 
+                          ("Y divisions:", self.ny_var), 
+                          ("Z divisions:", self.nz_var)]:
+            row = tk.Frame(self.custom_frame)
+            row.pack(fill=tk.X, pady=5)
+            tk.Label(row, text=label, width=12, anchor=tk.W).pack(side=tk.LEFT)
+            tk.Scale(row, from_=1, to=100, variable=var, 
+                    orient=tk.HORIZONTAL).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Right: Grading
+        right_col = tk.Frame(columns)
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        grading_frame = tk.LabelFrame(right_col, text="Grading", 
+                                      padx=15, pady=15, font=("Arial", 11, "bold"))
+        grading_frame.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(grading_frame, text="Grading type:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
+        
+        grading_types = [
+            ("simpleGrading", "simpleGrading"),
+            ("edgeGrading", "edgeGrading"),
+            ("multiGrading", "multiGrading")
+        ]
+        
+        for label, value in grading_types:
+            tk.Radiobutton(grading_frame, text=label, variable=self.grading_type, 
+                          value=value, font=("Arial", 9)).pack(anchor=tk.W)
+        
+        tk.Label(grading_frame, text="Expansion ratios:", 
+                font=("Arial", 9, "bold")).pack(anchor=tk.W, pady=(10, 5))
+        
+        self.grading_x = tk.DoubleVar(value=1.0)
+        self.grading_y = tk.DoubleVar(value=1.0)
+        self.grading_z = tk.DoubleVar(value=1.0)
+        
+        for label, var in [("X:", self.grading_x), ("Y:", self.grading_y), ("Z:", self.grading_z)]:
+            row = tk.Frame(grading_frame)
+            row.pack(fill=tk.X, pady=2)
+            tk.Label(row, text=label, width=3).pack(side=tk.LEFT)
+            tk.Entry(row, textvariable=var, width=10).pack(side=tk.LEFT, padx=5)
+        
+        # Create button
+        btn_frame = tk.Frame(main_frame)
+        btn_frame.pack(pady=20)
+        
+        tk.Button(btn_frame, text="← Back", command=lambda: self.notebook.select(0),
+                 width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Create Hex Block", command=self.create_hex_block,
+                 bg="lightgreen", font=("Arial", 11, "bold"), width=18).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="View Blocks →", command=lambda: self.notebook.select(2),
+                 width=12).pack(side=tk.LEFT, padx=5)
+        
+        self.update_sizing_ui()
+    
+    def _setup_blocks_tab(self):
+        main_frame = tk.Frame(self.tab_blocks)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        tk.Label(main_frame, text="Created Hex Blocks", 
+                font=("Arial", 14, "bold")).pack(pady=10)
+        
+        # Block list with scrollbar
+        list_frame = tk.Frame(main_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        scrollbar = tk.Scrollbar(list_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self._setup_layer_selection(scrollable_frame)
-        self._setup_point_selection(scrollable_frame)
-        self._setup_sizing_controls(scrollable_frame)
-        self._setup_grading_controls(scrollable_frame)
-        self._setup_block_list(scrollable_frame)
+        self.block_listbox = tk.Listbox(list_frame, font=("Courier", 10),
+                                        yscrollcommand=scrollbar.set, height=20)
+        self.block_listbox.pack(fill=tk.BOTH, expand=True)
+        self.block_listbox.bind('<<ListboxSelect>>', self.on_block_select)
+        scrollbar.config(command=self.block_listbox.yview)
         
-        self.update_3d_view()
+        # Buttons
+        btn_frame = tk.Frame(main_frame)
+        btn_frame.pack(pady=10)
+        
+        tk.Button(btn_frame, text="← Back to Sizing", command=lambda: self.notebook.select(1),
+                 width=15).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Edit Block", command=self.edit_block,
+                 bg="lightblue", width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Delete Block", command=self.delete_block,
+                 bg="salmon", width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Clear All", command=self.clear_all_blocks,
+                 bg="lightcoral", width=12).pack(side=tk.LEFT, padx=5)
         
     def _setup_layer_selection(self, parent):
         frame = tk.LabelFrame(parent, text="1. Select 2 Layers", 
@@ -246,165 +444,136 @@ class TabHexBlockMaking:
         tk.Button(btn_frame, text="Clear All", command=self.clear_all_blocks,
                  bg="lightcoral", width=8).pack(side=tk.LEFT, padx=2)
     
-    def update_layer_list(self):
+    def refresh_layers(self):
+        """Refresh the layer list from mesh_data"""
         self.layer_listbox.delete(0, tk.END)
         for name, z in sorted(self.mesh_data.layers.items(), key=lambda x: x[1]):
             num_points = len(self.mesh_data.points[name])
             self.layer_listbox.insert(tk.END, f"{name} (z={z}, {num_points} pts)")
+        self.draw_view()
     
-    def on_layer_select(self, event):
-        sel = self.layer_listbox.curselection()
-        
-        # Extract layer names
-        self.selected_layers = []
-        for idx in sel:
-            text = self.layer_listbox.get(idx)
-            name = text.split(" (z=")[0]
-            self.selected_layers.append(name)
-        
-        if len(self.selected_layers) > 2:
-            # Keep only last 2 selected
-            self.selected_layers = self.selected_layers[-2:]
-            # Update listbox selection
-            self.layer_listbox.selection_clear(0, tk.END)
-            for name in self.selected_layers:
-                for idx in range(self.layer_listbox.size()):
-                    if self.layer_listbox.get(idx).startswith(name):
-                        self.layer_listbox.selection_set(idx)
-        
-        if len(self.selected_layers) == 2:
-            self.layer_status.config(
-                text=f"✓ Selected: {self.selected_layers[0]} & {self.selected_layers[1]}", 
-                fg="green"
-            )
-        elif len(self.selected_layers) == 1:
-            self.layer_status.config(
-                text=f"Selected: {self.selected_layers[0]} - Select 1 more", 
-                fg="orange"
-            )
-        else:
-            self.layer_status.config(text="Select 2 layers", fg="gray")
-        
-        self.clear_point_selection()
-        self.update_3d_view()
+    def rotate_view(self, angle):
+        """Rotate the view"""
+        self.view_angle = (self.view_angle + angle) % 360
+        self.draw_view()
     
-    def update_3d_view(self):
-        self.ax_3d.clear()
+    def reset_view(self):
+        """Reset view to default"""
+        self.view_angle = 45
+        self.view_tilt = 30
+        self.draw_view()
+    
+    def project_3d_to_2d(self, point_3d):
+        """Simple isometric projection"""
+        x, y, z = point_3d
+        
+        # Rotate around Z axis
+        angle_rad = math.radians(self.view_angle)
+        x_rot = x * math.cos(angle_rad) - y * math.sin(angle_rad)
+        y_rot = x * math.sin(angle_rad) + y * math.cos(angle_rad)
+        
+        # Isometric projection
+        screen_x = x_rot - z
+        screen_y = y_rot * 0.5 + z * 0.5
+        
+        # Center on canvas
+        canvas_x = 300 + screen_x * 50
+        canvas_y = 300 - screen_y * 50
+        
+        return canvas_x, canvas_y
+    
+    def draw_view(self):
+        """Draw the 3D view on canvas"""
+        self.canvas.delete("all")
         
         if len(self.selected_layers) != 2:
-            self.ax_3d.text(0, 0, 0, "Select 2 layers first", 
-                           fontsize=12, ha='center')
-            self.canvas_3d.draw()
+            self.canvas.create_text(300, 300, text="Select 2 layers first",
+                                   font=("Arial", 16), fill="gray")
             return
         
-        # Get points from selected layers
-        all_points = []
-        point_colors = []
-        
+        # Collect all points from selected layers
+        all_points_3d = []
+        point_refs = []  # (layer, idx)
         colors = ['red', 'blue']
-        for i, layer in enumerate(self.selected_layers):
-            z = self.mesh_data.layers[layer]
-            for point_2d in self.mesh_data.points[layer]:
-                coords_3d = self.mesh_data.get_3d_coords(layer, point_2d)
-                all_points.append(coords_3d)
-                point_colors.append(colors[i])
         
-        if not all_points:
-            self.ax_3d.text(0, 0, 0, "No points in selected layers", 
-                           fontsize=12, ha='center')
-            self.canvas_3d.draw()
+        for i, layer in enumerate(self.selected_layers):
+            for idx, point_2d in enumerate(self.mesh_data.points[layer]):
+                coords_3d = self.mesh_data.get_3d_coords(layer, point_2d)
+                all_points_3d.append(coords_3d)
+                point_refs.append((layer, idx, colors[i]))
+        
+        if not all_points_3d:
+            self.canvas.create_text(300, 300, text="No points in selected layers",
+                                   font=("Arial", 16), fill="gray")
             return
         
-        # Plot points
-        for coords, color in zip(all_points, point_colors):
-            self.ax_3d.scatter(*coords, c=color, s=100, alpha=0.6)
-        
-        # Plot connections within layers
-        for i, layer in enumerate(self.selected_layers):
-            z = self.mesh_data.layers[layer]
-            points_2d = self.mesh_data.points[layer]
+        # Project and draw points
+        self.canvas_points = []  # Store for click detection
+        for (point_3d, (layer, idx, color)) in zip(all_points_3d, point_refs):
+            x, y = self.project_3d_to_2d(point_3d)
             
+            # Check if selected
+            is_selected = (layer, idx) in self.selected_points
+            size = 8 if not is_selected else 12
+            fill_color = 'green' if is_selected else color
+            
+            # Draw point
+            self.canvas.create_oval(x-size, y-size, x+size, y+size,
+                                   fill=fill_color, outline='black', width=2,
+                                   tags=f"point_{layer}_{idx}")
+            
+            # Add label
+            self.canvas.create_text(x, y-15, text=f"{idx}",
+                                   font=("Arial", 8), fill="black")
+            
+            # Store for click detection
+            self.canvas_points.append((x, y, layer, idx, point_3d))
+        
+        # Draw connections within layers
+        for i, layer in enumerate(self.selected_layers):
+            points_2d = self.mesh_data.points[layer]
             for conn in self.mesh_data.connections[layer]:
                 if conn[0] < len(points_2d) and conn[1] < len(points_2d):
-                    p1 = self.mesh_data.get_3d_coords(layer, points_2d[conn[0]])
-                    p2 = self.mesh_data.get_3d_coords(layer, points_2d[conn[1]])
+                    p1_3d = self.mesh_data.get_3d_coords(layer, points_2d[conn[0]])
+                    p2_3d = self.mesh_data.get_3d_coords(layer, points_2d[conn[1]])
                     
-                    self.ax_3d.plot([p1[0], p2[0]], [p1[1], p2[1]], [p1[2], p2[2]], 
-                                   colors[i] + '-', linewidth=2, alpha=0.5)
-        
-        # Highlight selected points
-        for layer, idx in self.selected_points:
-            if layer in self.selected_layers:
-                point_2d = self.mesh_data.points[layer][idx]
-                coords = self.mesh_data.get_3d_coords(layer, point_2d)
-                self.ax_3d.scatter(*coords, c='green', s=200, marker='o', 
-                                  edgecolors='darkgreen', linewidths=3, alpha=0.8)
+                    x1, y1 = self.project_3d_to_2d(p1_3d)
+                    x2, y2 = self.project_3d_to_2d(p2_3d)
+                    
+                    self.canvas.create_line(x1, y1, x2, y2, fill=colors[i], width=2)
         
         # Draw existing hex blocks
         for block in self.hex_blocks:
-            self._draw_hex_block(block)
+            verts = block['vertices']
+            edges = [
+                (0, 1), (1, 2), (2, 3), (3, 0),  # Bottom
+                (4, 5), (5, 6), (6, 7), (7, 4),  # Top
+                (0, 4), (1, 5), (2, 6), (3, 7)   # Vertical
+            ]
+            
+            for i, j in edges:
+                x1, y1 = self.project_3d_to_2d(verts[i])
+                x2, y2 = self.project_3d_to_2d(verts[j])
+                self.canvas.create_line(x1, y1, x2, y2, fill='green', width=3, dash=(5, 3))
         
-        # Set labels and limits
-        self.ax_3d.set_xlabel('X')
-        self.ax_3d.set_ylabel('Z')
-        self.ax_3d.set_zlabel('Y')
-        
-        # Auto-scale
-        if all_points:
-            xs, ys, zs = zip(*all_points)
-            self.ax_3d.set_xlim(min(xs)-1, max(xs)+1)
-            self.ax_3d.set_ylim(min(ys)-1, max(ys)+1)
-            self.ax_3d.set_zlim(min(zs)-1, max(zs)+1)
-        
-        self.ax_3d.set_title(f"Layers: {self.selected_layers[0]} (red) & {self.selected_layers[1]} (blue)")
-        
-        self.canvas_3d.draw()
+        # Add title
+        title = f"Layers: {self.selected_layers[0]} (red) & {self.selected_layers[1]} (blue)"
+        self.canvas.create_text(300, 20, text=title, font=("Arial", 12, "bold"))
     
-    def _draw_hex_block(self, block):
-        """Draw a hex block in the 3D view"""
-        verts = block['vertices']
-        
-        # Draw edges of hex
-        edges = [
-            (0, 1), (1, 2), (2, 3), (3, 0),  # Bottom face
-            (4, 5), (5, 6), (6, 7), (7, 4),  # Top face
-            (0, 4), (1, 5), (2, 6), (3, 7)   # Vertical edges
-        ]
-        
-        for i, j in edges:
-            p1 = verts[i]
-            p2 = verts[j]
-            self.ax_3d.plot([p1[0], p2[0]], [p1[1], p2[1]], [p1[2], p2[2]], 
-                           'g-', linewidth=2, alpha=0.7)
-    
-    def on_3d_click(self, event):
-        if event.inaxes != self.ax_3d or len(self.selected_layers) != 2:
-            return
-        
-        if event.button != 1:  # Only left click
+    def on_canvas_click(self, event):
+        """Handle click on canvas"""
+        if len(self.selected_layers) != 2:
             return
         
         # Find closest point
         min_dist = float('inf')
         closest = None
         
-        # Get 2D projection of click
-        x2d, y2d = event.xdata, event.ydata
-        
-        for layer in self.selected_layers:
-            z = self.mesh_data.layers[layer]
-            for idx, point_2d in enumerate(self.mesh_data.points[layer]):
-                coords_3d = self.mesh_data.get_3d_coords(layer, point_2d)
-                
-                # Project to 2D screen space (approximate)
-                proj = self.ax_3d.transData.transform(coords_3d)
-                click_proj = self.ax_3d.transData.transform([x2d, y2d, 0])
-                
-                dist = np.sqrt((proj[0] - event.x)**2 + (proj[1] - event.y)**2)
-                
-                if dist < min_dist and dist < 30:  # 30 pixel threshold
-                    min_dist = dist
-                    closest = (layer, idx)
+        for canvas_x, canvas_y, layer, idx, point_3d in self.canvas_points:
+            dist = math.sqrt((canvas_x - event.x)**2 + (canvas_y - event.y)**2)
+            if dist < min_dist and dist < 20:
+                min_dist = dist
+                closest = (layer, idx)
         
         if closest:
             # Toggle selection
@@ -418,7 +587,39 @@ class TabHexBlockMaking:
                     return
             
             self.update_point_list()
-            self.update_3d_view()
+            self.draw_view()
+    
+    def on_layer_select(self, event):
+        sel = self.layer_listbox.curselection()
+        
+        # Extract layer names
+        self.selected_layers = []
+        for idx in sel:
+            text = self.layer_listbox.get(idx)
+            name = text.split(" (z=")[0]
+            self.selected_layers.append(name)
+        
+        if len(self.selected_layers) > 2:
+            # Keep only last 2
+            self.selected_layers = self.selected_layers[-2:]
+            self.layer_listbox.selection_clear(0, tk.END)
+            for name in self.selected_layers:
+                for idx in range(self.layer_listbox.size()):
+                    if self.layer_listbox.get(idx).startswith(name):
+                        self.layer_listbox.selection_set(idx)
+        
+        if len(self.selected_layers) == 2:
+            self.layer_status.config(
+                text=f"✓ Selected: {self.selected_layers[0]} & {self.selected_layers[1]}", 
+                fg="green")
+        elif len(self.selected_layers) == 1:
+            self.layer_status.config(
+                text=f"Selected: {self.selected_layers[0]} - Select 1 more", fg="orange")
+        else:
+            self.layer_status.config(text="Select 2 layers", fg="gray")
+        
+        self.clear_point_selection()
+        self.draw_view()
     
     def update_point_list(self):
         self.point_list.delete(0, tk.END)
@@ -434,7 +635,7 @@ class TabHexBlockMaking:
     def clear_point_selection(self):
         self.selected_points = []
         self.update_point_list()
-        self.update_3d_view()
+        self.draw_view()
     
     def update_sizing_ui(self):
         # Hide all frames
@@ -445,11 +646,11 @@ class TabHexBlockMaking:
         # Show appropriate frame
         mode = self.sizing_mode.get()
         if mode == "universal":
-            self.universal_frame.pack(fill=tk.X, pady=5)
+            self.universal_frame.pack(fill=tk.X, pady=10)
         elif mode == "2d":
-            self.mode_2d_frame.pack(fill=tk.X, pady=5)
+            self.mode_2d_frame.pack(fill=tk.X, pady=10)
         elif mode == "custom":
-            self.custom_frame.pack(fill=tk.X, pady=5)
+            self.custom_frame.pack(fill=tk.X, pady=10)
     
     def create_hex_block(self):
         if len(self.selected_points) != 8:

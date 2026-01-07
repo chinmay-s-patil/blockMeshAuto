@@ -1,7 +1,8 @@
 """
 2D Editor Tab - Points & Connections
 Uses tkinter Canvas for direct 2D drawing (no matplotlib/plotly)
-ISO mode shows 2 separate canvases side-by-side
+Dual View mode shows 2 separate canvases side-by-side
+Includes pan/zoom controls
 """
 import tkinter as tk
 from tkinter import messagebox, simpledialog
@@ -15,10 +16,10 @@ class Tab2DEditor:
         self.selected_points = []
         self.selected_connection = None
         self.mode = "select"
-        self.iso_mode = False
-        self.iso_layers = []
-        self.iso_mode_var = tk.BooleanVar(value=False)
-        self.iso_layer_vars = {}
+        self.dual_view_mode = False
+        self.dual_view_layers = []
+        self.dual_view_var = tk.BooleanVar(value=False)
+        self.dual_view_layer_vars = {}
         
         # Canvas parameters
         self.canvas_width = 700
@@ -26,6 +27,11 @@ class Tab2DEditor:
         self.scale = 50  # pixels per unit
         self.offset_x = self.canvas_width / 2
         self.offset_y = self.canvas_height / 2
+        
+        # Pan/zoom state
+        self.panning = False
+        self.pan_start_x = 0
+        self.pan_start_y = 0
         
         # Canvas widgets (initialized in setup)
         self.canvas = None
@@ -53,7 +59,16 @@ class Tab2DEditor:
         self.canvas = tk.Canvas(self.canvas_container, bg="white", 
                                width=self.canvas_width, height=self.canvas_height)
         self.canvas.pack(fill=tk.BOTH, expand=True)
-        self.canvas.bind("<Button-1>", self.on_canvas_click)
+        self.setup_canvas_bindings(self.canvas)
+        
+        # Control buttons at bottom
+        button_frame = tk.Frame(self.left_frame)
+        button_frame.pack(fill=tk.X, pady=5)
+        
+        tk.Button(button_frame, text="🔍 Fit All", command=self.fit_all_view,
+                 bg="lightblue", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        tk.Label(button_frame, text="Pan: Right-drag | Zoom: Scroll",
+                font=("Arial", 9), fg="gray").pack(side=tk.LEFT, padx=10)
         
         # Right: Controls
         right_frame = tk.Frame(main_frame, width=350)
@@ -64,6 +79,116 @@ class Tab2DEditor:
         self._setup_layer_controls(right_frame)
         self._setup_manual_entry(right_frame)
         self._setup_connection_controls(right_frame)
+        
+        self.update_plot()
+    
+    def setup_canvas_bindings(self, canvas):
+        """Setup mouse bindings for a canvas"""
+        canvas.bind("<Button-1>", self.on_canvas_click)
+        canvas.bind("<Button-3>", self.on_pan_start)  # Right mouse for pan
+        canvas.bind("<B3-Motion>", self.on_pan_motion)
+        canvas.bind("<ButtonRelease-3>", self.on_pan_end)
+        canvas.bind("<MouseWheel>", self.on_zoom)  # Windows/Mac
+        canvas.bind("<Button-4>", self.on_zoom)  # Linux scroll up
+        canvas.bind("<Button-5>", self.on_zoom)  # Linux scroll down
+    
+    def on_pan_start(self, event):
+        """Start panning"""
+        self.panning = True
+        self.pan_start_x = event.x
+        self.pan_start_y = event.y
+    
+    def on_pan_motion(self, event):
+        """Pan the view"""
+        if self.panning:
+            dx = event.x - self.pan_start_x
+            dy = event.y - self.pan_start_y
+            
+            self.offset_x += dx
+            self.offset_y += dy
+            
+            self.pan_start_x = event.x
+            self.pan_start_y = event.y
+            
+            self.update_plot()
+    
+    def on_pan_end(self, event):
+        """End panning"""
+        self.panning = False
+    
+    def on_zoom(self, event):
+        """Zoom in/out"""
+        # Get zoom direction
+        if event.num == 4 or event.delta > 0:  # Scroll up
+            factor = 1.1
+        elif event.num == 5 or event.delta < 0:  # Scroll down
+            factor = 0.9
+        else:
+            return
+        
+        # Zoom centered on mouse position
+        canvas = event.widget
+        
+        # Get mouse position in world coords before zoom
+        old_world_x = (event.x - self.offset_x) / self.scale
+        old_world_y = (self.offset_y - event.y) / self.scale
+        
+        # Apply zoom
+        self.scale *= factor
+        
+        # Adjust offset to keep mouse position fixed
+        self.offset_x = event.x - old_world_x * self.scale
+        self.offset_y = event.y + old_world_y * self.scale
+        
+        self.update_plot()
+    
+    def fit_all_view(self):
+        """Fit all points in view with margin"""
+        # Collect all points
+        all_x, all_y = [], []
+        for layer in self.mesh_data.points:
+            for x, y in self.mesh_data.points[layer]:
+                all_x.append(x)
+                all_y.append(y)
+        
+        if not all_x or not all_y:
+            # Reset to default if no points
+            self.scale = 50
+            self.offset_x = (self.canvas.winfo_width() or self.canvas_width) / 2
+            self.offset_y = (self.canvas.winfo_height() or self.canvas_height) / 2
+            self.update_plot()
+            return
+        
+        # Calculate bounds
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+        
+        # Get the maximum range
+        range_x = max_x - min_x
+        range_y = max_y - min_y
+        max_range = max(range_x, range_y, 0.1)  # Avoid division by zero
+        
+        # Add buffer (2 units on each side)
+        buffer = 2.0
+        display_range = max_range + 2 * buffer
+        
+        # Get actual canvas size
+        if self.canvas:
+            canvas_w = self.canvas.winfo_width() or self.canvas_width
+            canvas_h = self.canvas.winfo_height() or self.canvas_height
+        else:
+            canvas_w = self.canvas_width // 2
+            canvas_h = self.canvas_height
+        
+        # Calculate scale to fit (use 90% of canvas to leave some margin)
+        self.scale = (min(canvas_w, canvas_h) * 0.9) / display_range
+        
+        # Center the view on the data center
+        center_x = (min_x + max_x) / 2
+        center_y = (min_y + max_y) / 2
+        
+        self.offset_x = canvas_w / 2 - center_x * self.scale
+        self.offset_y = canvas_h / 2 + center_y * self.scale
         
         self.update_plot()
         
@@ -113,28 +238,28 @@ class Tab2DEditor:
                                    font=("Arial", 9, "bold"), fg="blue")
         self.layer_info.pack(pady=5)
         
-        # ISO Mode
-        iso_frame = tk.LabelFrame(layer_frame, text="ISO Mode - Link 2 Layers", padx=10, pady=10)
-        iso_frame.pack(fill=tk.X, pady=5)
+        # Dual View Mode
+        dual_frame = tk.LabelFrame(layer_frame, text="Dual View - Link 2 Layers", padx=10, pady=10)
+        dual_frame.pack(fill=tk.X, pady=5)
         
-        tk.Checkbutton(iso_frame, text="Enable ISO Mode (Side-by-Side)", 
-                      variable=self.iso_mode_var, command=self.toggle_iso_mode,
+        tk.Checkbutton(dual_frame, text="Enable Dual View (Side-by-Side)", 
+                      variable=self.dual_view_var, command=self.toggle_dual_view,
                       font=("Arial", 9, "bold")).pack(anchor=tk.W)
         
-        tk.Label(iso_frame, text="Select exactly 2 layers:", font=("Arial", 8)).pack(anchor=tk.W, pady=(5,2))
+        tk.Label(dual_frame, text="Select exactly 2 layers:", font=("Arial", 8)).pack(anchor=tk.W, pady=(5,2))
         
-        iso_canvas_frame = tk.Frame(iso_frame, height=100)
-        iso_canvas_frame.pack(fill=tk.BOTH)
-        iso_canvas_frame.pack_propagate(False)
+        dual_canvas_frame = tk.Frame(dual_frame, height=100)
+        dual_canvas_frame.pack(fill=tk.BOTH)
+        dual_canvas_frame.pack_propagate(False)
         
-        self.iso_checkboxes_frame = tk.Frame(iso_canvas_frame)
-        self.iso_checkboxes_frame.pack(fill=tk.BOTH)
+        self.dual_checkboxes_frame = tk.Frame(dual_canvas_frame)
+        self.dual_checkboxes_frame.pack(fill=tk.BOTH)
         
-        self.update_iso_checkboxes()
+        self.update_dual_view_checkboxes()
         
-        self.iso_label = tk.Label(iso_frame, text="Select exactly 2 layers", 
+        self.dual_label = tk.Label(dual_frame, text="Select exactly 2 layers", 
                                  font=("Arial", 8, "italic"), fg="gray")
-        self.iso_label.pack(pady=2)
+        self.dual_label.pack(pady=2)
         
     def _setup_manual_entry(self, parent):
         manual_frame = tk.LabelFrame(parent, text="Manual Entry", padx=10, pady=10)
@@ -190,22 +315,22 @@ class Tab2DEditor:
             self.delete_btn.config(relief=tk.SUNKEN, bg="salmon")
             self.mode_label.config(text="Current Mode: Delete", fg="red")
     
-    def toggle_iso_mode(self):
-        self.iso_mode = self.iso_mode_var.get()
+    def toggle_dual_view(self):
+        self.dual_view_mode = self.dual_view_var.get()
         
-        if self.iso_mode:
-            self.update_iso_layers_from_checkboxes()
-            if len(self.iso_layers) == 2:
-                self.setup_iso_canvases()
-                self.iso_label.config(text=f"ISO Active: {self.iso_layers[0]} | {self.iso_layers[1]}", fg="green")
+        if self.dual_view_mode:
+            self.update_dual_view_layers_from_checkboxes()
+            if len(self.dual_view_layers) == 2:
+                self.setup_dual_view_canvases()
+                self.dual_label.config(text=f"Dual View Active: {self.dual_view_layers[0]} | {self.dual_view_layers[1]}", fg="green")
             else:
-                messagebox.showwarning("ISO Mode", "Select exactly 2 layers first!")
-                self.iso_mode_var.set(False)
-                self.iso_mode = False
+                messagebox.showwarning("Dual View Mode", "Select exactly 2 layers first!")
+                self.dual_view_var.set(False)
+                self.dual_view_mode = False
         else:
             self.setup_normal_canvas()
-            self.iso_label.config(text="Select exactly 2 layers", fg="gray")
-            self.iso_layers = []
+            self.dual_label.config(text="Select exactly 2 layers", fg="gray")
+            self.dual_view_layers = []
     
     def setup_normal_canvas(self):
         """Setup single canvas for normal mode"""
@@ -217,75 +342,77 @@ class Tab2DEditor:
         self.canvas = tk.Canvas(self.canvas_container, bg="white",
                                width=self.canvas_width, height=self.canvas_height)
         self.canvas.pack(fill=tk.BOTH, expand=True)
-        self.canvas.bind("<Button-1>", self.on_canvas_click)
+        self.setup_canvas_bindings(self.canvas)
         
         self.canvas_left = None
         self.canvas_right = None
         self.update_plot()
     
-    def setup_iso_canvases(self):
-        """Setup two side-by-side canvases for ISO mode"""
+    def setup_dual_view_canvases(self):
+        """Setup two side-by-side canvases for dual view mode"""
         for widget in self.canvas_container.winfo_children():
             widget.destroy()
         
-        self.canvas_label.config(text=f"ISO Mode: {self.iso_layers[0]} (Left) | {self.iso_layers[1]} (Right)")
+        self.canvas_label.config(text=f"Dual View: {self.dual_view_layers[0]} (Left) | {self.dual_view_layers[1]} (Right)")
         
         # Left canvas
         left_frame = tk.Frame(self.canvas_container)
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2)
         
-        tk.Label(left_frame, text=f"{self.iso_layers[0]} (Red)", 
+        tk.Label(left_frame, text=f"{self.dual_view_layers[0]} (Red)", 
                 font=("Arial", 10, "bold"), fg="red").pack()
         
         self.canvas_left = tk.Canvas(left_frame, bg="white",
                                      width=self.canvas_width//2, height=self.canvas_height)
         self.canvas_left.pack(fill=tk.BOTH, expand=True)
-        self.canvas_left.bind("<Button-1>", lambda e: self.on_iso_click(e, 0))
+        self.canvas_left.bind("<Button-1>", lambda e: self.on_dual_click(e, 0))
+        self.setup_canvas_bindings(self.canvas_left)
         
         # Right canvas
         right_frame = tk.Frame(self.canvas_container)
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2)
         
-        tk.Label(right_frame, text=f"{self.iso_layers[1]} (Blue)", 
+        tk.Label(right_frame, text=f"{self.dual_view_layers[1]} (Blue)", 
                 font=("Arial", 10, "bold"), fg="blue").pack()
         
         self.canvas_right = tk.Canvas(right_frame, bg="white",
                                       width=self.canvas_width//2, height=self.canvas_height)
         self.canvas_right.pack(fill=tk.BOTH, expand=True)
-        self.canvas_right.bind("<Button-1>", lambda e: self.on_iso_click(e, 1))
+        self.canvas_right.bind("<Button-1>", lambda e: self.on_dual_click(e, 1))
+        self.setup_canvas_bindings(self.canvas_right)
         
         self.canvas = None
         self.update_plot()
     
-    def update_iso_checkboxes(self):
-        for widget in self.iso_checkboxes_frame.winfo_children():
+    def update_dual_view_checkboxes(self):
+        for widget in self.dual_checkboxes_frame.winfo_children():
             widget.destroy()
         
-        self.iso_layer_vars = {}
+        self.dual_view_layer_vars = {}
         
         for name in sorted(self.mesh_data.layers.keys(), key=lambda l: self.mesh_data.layers[l]):
             var = tk.BooleanVar(value=False)
-            self.iso_layer_vars[name] = var
-            cb = tk.Checkbutton(self.iso_checkboxes_frame, text=f"{name} (z={self.mesh_data.layers[name]})", 
-                              variable=var, command=self.update_iso_layers_from_checkboxes)
+            self.dual_view_layer_vars[name] = var
+            cb = tk.Checkbutton(self.dual_checkboxes_frame, text=f"{name} (z={self.mesh_data.layers[name]})", 
+                              variable=var, command=self.update_dual_view_layers_from_checkboxes)
             cb.pack(anchor=tk.W)
     
-    def update_iso_layers_from_checkboxes(self):
-        self.iso_layers = [name for name, var in self.iso_layer_vars.items() if var.get()]
+    def update_dual_view_layers_from_checkboxes(self):
+        self.dual_view_layers = [name for name, var in self.dual_view_layer_vars.items() if var.get()]
         
-        if len(self.iso_layers) > 2:
-            oldest = self.iso_layers[0]
-            self.iso_layer_vars[oldest].set(False)
-            self.iso_layers = [name for name, var in self.iso_layer_vars.items() if var.get()]
+        if len(self.dual_view_layers) > 2:
+            oldest = self.dual_view_layers[0]
+            self.dual_view_layer_vars[oldest].set(False)
+            self.dual_view_layers = [name for name, var in self.dual_view_layer_vars.items() if var.get()]
         
-        if len(self.iso_layers) == 2:
-            self.iso_label.config(text=f"Ready: {self.iso_layers[0]} ↔ {self.iso_layers[1]}", fg="green")
-            if self.iso_mode:
-                self.setup_iso_canvases()
-        elif len(self.iso_layers) == 1:
-            self.iso_label.config(text=f"Selected: {self.iso_layers[0]} - Select 1 more", fg="orange")
+        if len(self.dual_view_layers) == 2:
+            self.dual_label.config(text=f"Ready: {self.dual_view_layers[0]} ↔ {self.dual_view_layers[1]}", fg="green")
+            if self.dual_view_mode:
+                self.setup_dual_view_canvases()
+        elif len(self.dual_view_layers) == 1:
+            self.dual_label.config(text=f"Selected: {self.dual_view_layers[0]} - Select 1 more", fg="orange")
         else:
-            self.iso_label.config(text="Select exactly 2 layers", fg="gray")
+            self.dual_label.config(text="Select exactly 2 layers", fg="gray")
     
     def world_to_canvas(self, x, y, canvas_widget=None):
         """Convert world coordinates to canvas coordinates"""
@@ -309,7 +436,7 @@ class Tab2DEditor:
     
     def on_canvas_click(self, event):
         """Handle click on single canvas (normal mode)"""
-        if self.iso_mode:
+        if self.dual_view_mode or self.panning:
             return
         
         x, y = self.canvas_to_world(event.x, event.y, self.canvas)
@@ -353,13 +480,13 @@ class Tab2DEditor:
         
         self.update_plot()
     
-    def on_iso_click(self, event, canvas_idx):
-        """Handle click on ISO mode canvases"""
-        if not self.iso_mode or len(self.iso_layers) != 2:
+    def on_dual_click(self, event, canvas_idx):
+        """Handle click on dual view canvases"""
+        if not self.dual_view_mode or len(self.dual_view_layers) != 2 or self.panning:
             return
         
         canvas_widget = self.canvas_left if canvas_idx == 0 else self.canvas_right
-        layer = self.iso_layers[canvas_idx]
+        layer = self.dual_view_layers[canvas_idx]
         
         x, y = self.canvas_to_world(event.x, event.y, canvas_widget)
         points = self.mesh_data.points[layer]
@@ -411,8 +538,8 @@ class Tab2DEditor:
     
     def update_plot(self):
         """Redraw the canvas(es)"""
-        if self.iso_mode and len(self.iso_layers) == 2:
-            self.draw_iso_mode()
+        if self.dual_view_mode and len(self.dual_view_layers) == 2:
+            self.draw_dual_view()
         else:
             self.draw_normal_mode()
     
@@ -453,7 +580,7 @@ class Tab2DEditor:
                                    fill=color, outline="black")
             self.canvas.create_text(cx, cy-15, text=str(idx), font=("Arial", 9, "bold"))
     
-    def draw_iso_mode(self):
+    def draw_dual_view(self):
         """Draw two layers on separate canvases"""
         if not self.canvas_left or not self.canvas_right:
             return
@@ -466,7 +593,7 @@ class Tab2DEditor:
         self.draw_grid(self.canvas_right)
         
         # Draw left layer (red)
-        layer_left = self.iso_layers[0]
+        layer_left = self.dual_view_layers[0]
         points_left = self.mesh_data.points[layer_left]
         
         for conn in self.mesh_data.connections[layer_left]:
@@ -492,7 +619,7 @@ class Tab2DEditor:
             self.canvas_left.create_text(cx, cy-15, text=str(idx), font=("Arial", 9, "bold"))
         
         # Draw right layer (blue)
-        layer_right = self.iso_layers[1]
+        layer_right = self.dual_view_layers[1]
         points_right = self.mesh_data.points[layer_right]
         
         for conn in self.mesh_data.connections[layer_right]:
@@ -587,7 +714,7 @@ class Tab2DEditor:
             self.mesh_data.add_inter_layer_connection(current, i, name, i)
         
         self.update_layer_list()
-        self.update_iso_checkboxes()
+        self.update_dual_view_checkboxes()
         messagebox.showinfo("Success", f"Layer extruded: {name}\n{num_points} inter-layer connections created")
     
     def update_layer_list(self):
@@ -618,7 +745,7 @@ class Tab2DEditor:
         if z is not None:
             self.mesh_data.add_layer(name, z)
             self.update_layer_list()
-            self.update_iso_checkboxes()
+            self.update_dual_view_checkboxes()
     
     def duplicate_layer(self):
         current = self.mesh_data.current_layer
@@ -637,7 +764,7 @@ class Tab2DEditor:
             self.mesh_data.points[name] = self.mesh_data.points[current].copy()
             self.mesh_data.connections[name] = self.mesh_data.connections[current].copy()
             self.update_layer_list()
-            self.update_iso_checkboxes()
+            self.update_dual_view_checkboxes()
             messagebox.showinfo("Success", f"Layer duplicated: {name}")
     
     def remove_layer(self):
@@ -648,5 +775,5 @@ class Tab2DEditor:
         self.mesh_data.remove_layer(self.mesh_data.current_layer)
         self.mesh_data.current_layer = list(self.mesh_data.layers.keys())[0]
         self.update_layer_list()
-        self.update_iso_checkboxes()
+        self.update_dual_view_checkboxes()
         self.update_plot()

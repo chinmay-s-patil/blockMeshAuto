@@ -130,10 +130,16 @@ class Tab2DEditor:
         tk.Label(entry_grid, text="X:").grid(row=0, column=0)
         self.x_entry = tk.Entry(entry_grid, width=8)
         self.x_entry.grid(row=0, column=1, padx=2)
+        # Select all text on click
+        self.x_entry.bind("<FocusIn>", lambda e: e.widget.select_range(0, tk.END))
+        self.x_entry.bind("<Button-1>", lambda e: e.widget.select_range(0, tk.END))
         
         tk.Label(entry_grid, text="Y:").grid(row=0, column=2)
         self.y_entry = tk.Entry(entry_grid, width=8)
         self.y_entry.grid(row=0, column=3, padx=2)
+        # Select all text on click
+        self.y_entry.bind("<FocusIn>", lambda e: e.widget.select_range(0, tk.END))
+        self.y_entry.bind("<Button-1>", lambda e: e.widget.select_range(0, tk.END))
         
         tk.Button(manual_frame, text="Add Point", command=self.add_point_manual).pack(pady=5)
         
@@ -343,8 +349,7 @@ class Tab2DEditor:
             x = float(self.x_entry.get())
             y = float(self.y_entry.get())
             self.mesh_data.add_point(self.mesh_data.current_layer, x, y)
-            self.x_entry.delete(0, tk.END)
-            self.y_entry.delete(0, tk.END)
+            # Don't clear the entries - keep the values for easy modification
             self.update_plot()
         except ValueError:
             messagebox.showerror("Error", "Enter valid numbers")

@@ -16,6 +16,39 @@ class MeshData:
         self.project_name = "Untitled Project"
         self.project_description = ""
         
+        # Unit system
+        self.unit_system = "m"  # m, cm, mm, or scientific
+        self.unit_sci_exponent = "0"  # For scientific notation: 10^n
+        
+    def get_scale_value(self):
+        """Get the numerical scale value for blockMeshDict"""
+        if self.unit_system == "m":
+            return 1.0
+        elif self.unit_system == "cm":
+            return 0.01
+        elif self.unit_system == "mm":
+            return 0.001
+        elif self.unit_system == "scientific":
+            try:
+                exp = float(self.unit_sci_exponent)
+                return 10**exp
+            except:
+                return 1.0
+        else:
+            return 1.0
+    
+    def get_safe_project_name(self):
+        """Get a filesystem-safe version of the project name"""
+        import re
+        # Remove/replace invalid filename characters
+        safe_name = re.sub(r'[<>:"/\\|?*]', '_', self.project_name)
+        # Remove leading/trailing spaces and dots
+        safe_name = safe_name.strip('. ')
+        # If empty after cleaning, use default
+        if not safe_name:
+            safe_name = "untitled_project"
+        return safe_name
+        
     def add_layer(self, name, z_value):
         self.layers[name] = z_value
         self.points[name] = []
@@ -173,7 +206,9 @@ class MeshData:
             "patches": self.patches,
             "sketch_plane": self.sketch_plane,
             "project_name": self.project_name,
-            "project_description": self.project_description
+            "project_description": self.project_description,
+            "unit_system": self.unit_system,
+            "unit_sci_exponent": self.unit_sci_exponent
         }
     
     def from_dict(self, data):
@@ -187,3 +222,5 @@ class MeshData:
         self.sketch_plane = data.get("sketch_plane", "XY")
         self.project_name = data.get("project_name", "Untitled Project")
         self.project_description = data.get("project_description", "")
+        self.unit_system = data.get("unit_system", "m")
+        self.unit_sci_exponent = data.get("unit_sci_exponent", "0")

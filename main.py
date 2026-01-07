@@ -22,7 +22,10 @@ class MeshBuilderApp:
         self.root.geometry("1400x900")
         
         self.mesh_data = MeshData()
-        self.temp_json_file = "mesh_export_temp.json"
+        
+        # Ensure temp directory exists
+        if not os.path.exists("temp"):
+            os.makedirs("temp")
         
         self.setup_top_bar()
         self.setup_notebook()
@@ -76,12 +79,27 @@ class MeshBuilderApp:
         self.patches_3d = Tab3DPatches(self.tab_3d, self.mesh_data)
         self.export_tab = TabExport(self.tab_export, self.mesh_data)
     
+    def get_temp_filename(self):
+        """Get the temp filename based on project name"""
+        safe_name = self.mesh_data.get_safe_project_name()
+        return os.path.join("temp", f"{safe_name}_temp.json")
+    
+    def get_default_save_filename(self):
+        """Get the default save filename based on project name"""
+        safe_name = self.mesh_data.get_safe_project_name()
+        return f"{safe_name}.json"
+    
     def save_to_json(self):
         """Save project to JSON file"""
+        # Save any pending settings from Tab 1
+        self.project_settings.save_all_settings()
+        
+        default_filename = self.get_default_save_filename()
+        
         filename = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-            initialfile="mesh_export_project.json"
+            initialfile=default_filename
         )
         
         if filename:
@@ -118,13 +136,18 @@ class MeshBuilderApp:
                 messagebox.showerror("Error", f"Failed to load: {str(e)}")
     
     def auto_save(self):
-        """Auto-save project every 30 seconds"""
+        """Auto-save project every 30 seconds to temp folder"""
         try:
+            # Save any pending settings from Tab 1
+            if hasattr(self.project_settings, 'save_all_settings'):
+                self.project_settings.save_all_settings()
+            
+            temp_file = self.get_temp_filename()
             data = self.mesh_data.to_dict()
-            with open(self.temp_json_file, 'w') as f:
+            with open(temp_file, 'w') as f:
                 json.dump(data, f, indent=2)
-        except:
-            pass
+        except Exception as e:
+            print(f"Auto-save error: {e}")
         
         self.root.after(30000, self.auto_save)
     

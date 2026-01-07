@@ -13,6 +13,9 @@ class BlockMeshExporter:
         blocks = self._get_blocks(vertex_map)
         patches = self._get_patches(vertex_map)
         
+        # Get scale value from unit system
+        scale_value = self.mesh_data.get_scale_value()
+        
         output = []
         output.append("/*--------------------------------*- C++ -*----------------------------------*\\")
         output.append("| =========                 |                                                 |")
@@ -30,7 +33,16 @@ class BlockMeshExporter:
         output.append("}")
         output.append("// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //")
         output.append("")
-        output.append("scale   1;")
+        
+        # Add unit information as comment
+        unit_info = f"// Unit system: {self.mesh_data.unit_system}"
+        if self.mesh_data.unit_system == "scientific":
+            unit_info += f" (10^{self.mesh_data.unit_sci_exponent})"
+        output.append(unit_info)
+        output.append("")
+        
+        # Scale parameter with actual value
+        output.append(f"scale   {scale_value};")
         output.append("")
         
         # Vertices - sequential numbering

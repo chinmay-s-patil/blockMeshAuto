@@ -1,11 +1,16 @@
 """
 2D Editor Tab - Points & Connections
+ISO Mode now uses Plotly 3D for proper point selection
 """
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import numpy as np
+import plotly.graph_objects as go
+import webbrowser
+import os
+import tempfile
 
 
 class Tab2DEditor:
@@ -20,24 +25,30 @@ class Tab2DEditor:
         self.iso_mode_var = tk.BooleanVar(value=False)
         self.iso_layer_vars = {}
         
+        # For Plotly ISO mode
+        self.iso_fig = None
+        self.iso_html_file = None
+        
         self.setup_ui()
         
     def setup_ui(self):
         main_frame = tk.Frame(self.parent)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Left: Canvas
-        left_frame = tk.Frame(main_frame)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Left: Canvas (will switch between 2D matplotlib and 3D plotly message)
+        self.left_frame = tk.Frame(main_frame)
+        self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        tk.Label(left_frame, text="X-Y Plane View (2D)", font=("Arial", 12, "bold")).pack()
+        self.view_label = tk.Label(self.left_frame, text="X-Y Plane View (2D)", 
+                                   font=("Arial", 12, "bold"))
+        self.view_label.pack()
         
-        self.fig_2d = Figure(figsize=(7, 7))
-        self.ax_2d = self.fig_2d.add_subplot(111)
-        self.canvas_2d = FigureCanvasTkAgg(self.fig_2d, left_frame)
-        self.canvas_2d.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        # Container for view (will swap between matplotlib and plotly placeholder)
+        self.view_container = tk.Frame(self.left_frame, bg="white")
+        self.view_container.pack(fill=tk.BOTH, expand=True)
         
-        self.canvas_2d.mpl_connect('button_press_event', self.on_2d_click)
+        # Create matplotlib view
+        self.setup_2d_view()
         
         # Right: Controls
         right_frame = tk.Frame(main_frame, width=350)
@@ -50,6 +61,52 @@ class Tab2DEditor:
         self._setup_connection_controls(right_frame)
         
         self.update_plot()
+        
+    def setup_2d_view(self):
+        """Setup matplotlib 2D view"""
+        # Clear container
+        for widget in self.view_container.winfo_children():
+            widget.destroy()
+        
+        self.fig_2d = Figure(figsize=(7, 7))
+        self.ax_2d = self.fig_2d.add_subplot(111)
+        self.canvas_2d = FigureCanvasTkAgg(self.fig_2d, self.view_container)
+        self.canvas_2d.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.canvas_2d.mpl_connect('button_press_event', self.on_2d_click)
+        
+    def setup_iso_view(self):
+        """Setup Plotly 3D ISO view placeholder"""
+        # Clear container
+        for widget in self.view_container.winfo_children():
+            widget.destroy()
+        
+        # Create placeholder with open button
+        placeholder_frame = tk.Frame(self.view_container, bg="white")
+        placeholder_frame.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(placeholder_frame, 
+                text="ISO Mode - 3D View Active\n\n"
+                     f"Layers: {self.iso_layers[0]} & {self.iso_layers[1]}\n\n"
+                     "Click button below to open interactive 3D view",
+                font=("Arial", 11), bg="white", fg="darkblue").pack(pady=30)
+        
+        tk.Button(placeholder_frame, text="🔍 Open 3D ISO View in Browser",
+                 command=self.open_iso_view_browser,
+                 bg="lightgreen", font=("Arial", 12, "bold"),
+                 padx=20, pady=15).pack(pady=10)
+        
+        tk.Label(placeholder_frame,
+                text="In 3D view:\n"
+                     "• Click points to select them\n"
+                     "• Switch to 'Connect' mode and click 2 points to link layers\n"
+                     "• Green circles = selected points\n"
+                     "• Rotate: left-drag | Pan: right-drag | Zoom: scroll",
+                font=("Arial", 9), bg="white", fg="gray", justify=tk.LEFT).pack(pady=20)
+        
+        tk.Button(placeholder_frame, text="🔄 Refresh ISO View",
+                 command=self.update_iso_3d,
+                 bg="lightblue", font=("Arial", 10, "bold"),
+                 padx=15, pady=10).pack(pady=5)
         
     def _setup_mode_controls(self, parent):
         mode_frame = tk.LabelFrame(parent, text="Mode", padx=10, pady=10)
@@ -101,7 +158,7 @@ class Tab2DEditor:
         iso_frame = tk.LabelFrame(layer_frame, text="ISO Mode - Link Between Layers", padx=10, pady=10)
         iso_frame.pack(fill=tk.X, pady=5)
         
-        tk.Checkbutton(iso_frame, text="Enable Iso Mode", 
+        tk.Checkbutton(iso_frame, text="Enable Iso Mode (3D View)", 
                       variable=self.iso_mode_var, command=self.toggle_iso_mode,
                       font=("Arial", 9, "bold")).pack(anchor=tk.W)
         
@@ -130,14 +187,12 @@ class Tab2DEditor:
         tk.Label(entry_grid, text="X:").grid(row=0, column=0)
         self.x_entry = tk.Entry(entry_grid, width=8)
         self.x_entry.grid(row=0, column=1, padx=2)
-        # Select all text on click
         self.x_entry.bind("<FocusIn>", lambda e: e.widget.select_range(0, tk.END))
         self.x_entry.bind("<Button-1>", lambda e: e.widget.select_range(0, tk.END))
         
         tk.Label(entry_grid, text="Y:").grid(row=0, column=2)
         self.y_entry = tk.Entry(entry_grid, width=8)
         self.y_entry.grid(row=0, column=3, padx=2)
-        # Select all text on click
         self.y_entry.bind("<FocusIn>", lambda e: e.widget.select_range(0, tk.END))
         self.y_entry.bind("<Button-1>", lambda e: e.widget.select_range(0, tk.END))
         
@@ -178,13 +233,25 @@ class Tab2DEditor:
     
     def toggle_iso_mode(self):
         self.iso_mode = self.iso_mode_var.get()
+        
         if self.iso_mode:
             self.iso_label.config(text="Iso Mode Active - Select 2 layers below", fg="green")
             self.update_iso_layers_from_checkboxes()
+            
+            if len(self.iso_layers) == 2:
+                self.view_label.config(text="ISO Mode - 3D View")
+                self.setup_iso_view()
+                self.update_iso_3d()
+            else:
+                messagebox.showwarning("ISO Mode", "Please select exactly 2 layers first!")
+                self.iso_mode_var.set(False)
+                self.iso_mode = False
         else:
             self.iso_label.config(text="Select exactly 2 layers", fg="gray")
             self.iso_layers = []
-        self.update_plot()
+            self.view_label.config(text="X-Y Plane View (2D)")
+            self.setup_2d_view()
+            self.update_plot()
     
     def update_iso_checkboxes(self):
         for widget in self.iso_checkboxes_frame.winfo_children():
@@ -209,28 +276,163 @@ class Tab2DEditor:
         
         if len(self.iso_layers) == 2:
             self.iso_label.config(text=f"Linking: {self.iso_layers[0]} ↔ {self.iso_layers[1]}", fg="green")
+            if self.iso_mode:
+                self.update_iso_3d()
         elif len(self.iso_layers) == 1:
             self.iso_label.config(text=f"Selected: {self.iso_layers[0]} - Select 1 more", fg="orange")
         else:
             self.iso_label.config(text="Select exactly 2 layers", fg="gray")
+    
+    def update_iso_3d(self):
+        """Create Plotly 3D view for ISO mode"""
+        if len(self.iso_layers) != 2:
+            return
         
-        if self.iso_mode:
-            self.update_plot()
+        self.iso_fig = go.Figure()
+        
+        colors = ['red', 'blue']
+        point_data = []  # Store point info for click handling
+        
+        # Draw points and connections for both layers
+        for i, layer in enumerate(self.iso_layers):
+            color = colors[i]
+            points = self.mesh_data.points[layer]
+            z = self.mesh_data.layers[layer]
+            
+            if not points:
+                continue
+            
+            # Plot points
+            for idx, (x, y) in enumerate(points):
+                coords_3d = self.mesh_data.get_3d_coords(layer, (x, y))
+                is_selected = (layer, idx) in self.selected_points
+                
+                point_data.append({
+                    'layer': layer,
+                    'idx': idx,
+                    'coords': coords_3d,
+                    'x': coords_3d[0],
+                    'y': coords_3d[1],
+                    'z': coords_3d[2]
+                })
+                
+                marker_size = 20 if is_selected else 12
+                marker_color = 'lime' if is_selected else color
+                
+                self.iso_fig.add_trace(go.Scatter3d(
+                    x=[coords_3d[0]],
+                    y=[coords_3d[1]],
+                    z=[coords_3d[2]],
+                    mode='markers+text',
+                    marker=dict(size=marker_size, color=marker_color, 
+                               line=dict(color='black', width=2) if is_selected else dict(width=0)),
+                    text=[f'{idx}'],
+                    textposition='top center',
+                    textfont=dict(size=10, color='black'),
+                    name=f'{layer}[{idx}]',
+                    showlegend=False,
+                    hoverinfo='text',
+                    hovertext=f'{layer}[{idx}]<br>Click to select<br>Coords: ({coords_3d[0]:.2f}, {coords_3d[1]:.2f}, {coords_3d[2]:.2f})',
+                    customdata=[{'layer': layer, 'idx': idx}]
+                ))
+            
+            # Draw connections within layer
+            for conn in self.mesh_data.connections[layer]:
+                if conn[0] < len(points) and conn[1] < len(points):
+                    p1 = self.mesh_data.get_3d_coords(layer, points[conn[0]])
+                    p2 = self.mesh_data.get_3d_coords(layer, points[conn[1]])
+                    
+                    self.iso_fig.add_trace(go.Scatter3d(
+                        x=[p1[0], p2[0]],
+                        y=[p1[1], p2[1]],
+                        z=[p1[2], p2[2]],
+                        mode='lines',
+                        line=dict(color=color, width=4),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    ))
+        
+        # Draw inter-layer connections
+        for layer1, idx1, layer2, idx2 in self.mesh_data.inter_layer_connections:
+            if layer1 in self.iso_layers and layer2 in self.iso_layers:
+                if idx1 < len(self.mesh_data.points[layer1]) and idx2 < len(self.mesh_data.points[layer2]):
+                    p1 = self.mesh_data.get_3d_coords(layer1, self.mesh_data.points[layer1][idx1])
+                    p2 = self.mesh_data.get_3d_coords(layer2, self.mesh_data.points[layer2][idx2])
+                    
+                    self.iso_fig.add_trace(go.Scatter3d(
+                        x=[p1[0], p2[0]],
+                        y=[p1[1], p2[1]],
+                        z=[p1[2], p2[2]],
+                        mode='lines',
+                        line=dict(color='green', width=6, dash='dash'),
+                        showlegend=False,
+                        hoverinfo='text',
+                        hovertext=f'Inter-layer: {layer1}[{idx1}] ↔ {layer2}[{idx2}]'
+                    ))
+        
+        # Update layout
+        self.iso_fig.update_layout(
+            scene=dict(
+                xaxis_title='X',
+                yaxis_title='Z',
+                zaxis_title='Y',
+                aspectmode='data'
+            ),
+            title=f"ISO Mode: {self.iso_layers[0]} (red) & {self.iso_layers[1]} (blue)",
+            hovermode='closest',
+            showlegend=False,
+            margin=dict(l=0, r=0, t=40, b=0)
+        )
+        
+    def open_iso_view_browser(self):
+        """Open ISO 3D view in browser"""
+        if self.iso_fig is None:
+            self.update_iso_3d()
+        
+        if self.iso_fig:
+            # Add instructions to the figure
+            self.iso_fig.add_annotation(
+                text=f"<b>ISO Mode Instructions</b><br>"
+                     f"Current Mode: {self.mode.upper()}<br><br>"
+                     f"<b>Connect Mode:</b> Click 2 points (one from each layer) to link them<br>"
+                     f"<b>Select Mode:</b> Click points to select/deselect<br>"
+                     f"<b>Delete Mode:</b> Click points to delete<br><br>"
+                     f"Green markers = Selected | Red = {self.iso_layers[0]} | Blue = {self.iso_layers[1]}<br>"
+                     f"After clicking, refresh view to see changes",
+                xref="paper", yref="paper",
+                x=0.5, y=0.98,
+                showarrow=False,
+                font=dict(size=11),
+                bgcolor="lightyellow",
+                bordercolor="black",
+                borderwidth=2,
+                xanchor='center',
+                yanchor='top'
+            )
+            
+            # Show in browser
+            self.iso_fig.show()
+            
+            messagebox.showinfo("ISO View Opened",
+                              f"3D view opened in browser\n\n"
+                              f"Current mode: {self.mode}\n"
+                              f"Selected points: {len(self.selected_points)}\n\n"
+                              f"NOTE: Point clicking in browser is view-only.\n"
+                              f"Use the list below to select points, then click 'Refresh ISO View'")
     
     def on_2d_click(self, event):
+        """Handle clicks in 2D matplotlib view (non-ISO mode only)"""
+        if self.iso_mode:
+            return
+        
         if event.inaxes != self.ax_2d:
             return
         
         x, y = event.xdata, event.ydata
-        
-        if self.iso_mode and len(self.iso_layers) == 2:
-            self.handle_iso_click(x, y)
-            return
-        
         layer = self.mesh_data.current_layer
         points = self.mesh_data.points[layer]
         
-        # Check if clicking near a connection for deletion (in select mode only)
+        # Check if clicking near a connection for deletion
         if self.mode == "select":
             clicked_conn = self._find_connection_near_point(x, y, layer)
             if clicked_conn is not None:
@@ -258,12 +460,11 @@ class Tab2DEditor:
                 if clicked_idx not in self.selected_points:
                     self.selected_points.append(clicked_idx)
                     
-                    # Auto-connect when 2 points selected
                     if len(self.selected_points) == 2:
                         self.mesh_data.add_connection(layer, 
                                                      self.selected_points[0], 
                                                      self.selected_points[1])
-                        self.selected_points = []  # Clear selection after connecting
+                        self.selected_points = []
                     
                     self.selection_label.config(text=f"Selected: {self.selected_points}")
         elif self.mode == "select":
@@ -287,7 +488,6 @@ class Tab2DEditor:
             p2 = np.array(points[conn[1]])
             click = np.array([x, y])
             
-            # Distance from point to line segment
             line_vec = p2 - p1
             line_len = np.linalg.norm(line_vec)
             if line_len < 1e-6:
@@ -308,56 +508,21 @@ class Tab2DEditor:
         
         return None
     
-    def handle_iso_click(self, x, y):
-        min_dist = float('inf')
-        closest_point = None
-        
-        for layer in self.iso_layers:
-            points = self.mesh_data.points[layer]
-            for idx, (px, py) in enumerate(points):
-                dist = np.sqrt((px - x)**2 + (py - y)**2)
-                if dist < min_dist and dist < 0.5:
-                    min_dist = dist
-                    closest_point = (layer, idx)
-        
-        if closest_point:
-            if closest_point not in self.selected_points:
-                self.selected_points.append(closest_point)
-                
-                # Auto-connect when 2 points selected in connect mode
-                if len(self.selected_points) == 2 and self.mode == "connect":
-                    layer1, idx1 = self.selected_points[0]
-                    layer2, idx2 = self.selected_points[1]
-                    
-                    if layer1 != layer2:
-                        self.mesh_data.add_inter_layer_connection(layer1, idx1, layer2, idx2)
-                    else:
-                        self.mesh_data.add_connection(layer1, idx1, idx2)
-                    
-                    self.selected_points = []  # Clear after connecting
-                
-                if len(self.selected_points) > 2:
-                    self.selected_points.pop(0)
-            else:
-                self.selected_points.remove(closest_point)
-            
-            self.selection_label.config(text=f"Selected: {self.selected_points}")
-            self.update_plot()
-    
     def add_point_manual(self):
         try:
             x = float(self.x_entry.get())
             y = float(self.y_entry.get())
             self.mesh_data.add_point(self.mesh_data.current_layer, x, y)
-            # Don't clear the entries - keep the values for easy modification
             self.update_plot()
+            if self.iso_mode:
+                self.update_iso_3d()
         except ValueError:
             messagebox.showerror("Error", "Enter valid numbers")
     
     def delete_connection(self):
         """Delete the selected connection"""
         if self.selected_connection is None:
-            messagebox.showwarning("Warning", "No connection selected. Click near a connection line to select it.")
+            messagebox.showwarning("Warning", "No connection selected")
             return
         
         layer, conn = self.selected_connection
@@ -365,21 +530,20 @@ class Tab2DEditor:
             self.mesh_data.connections[layer].remove(conn)
             self.selected_connection = None
             self.update_plot()
-        else:
-            messagebox.showerror("Error", "Connection not found")
     
     def clear_selection(self):
         self.selected_points = []
         self.selected_connection = None
         self.selection_label.config(text="Selected: None")
         self.update_plot()
+        if self.iso_mode:
+            self.update_iso_3d()
     
     def extrude_layer(self):
-        """Extrude current layer by duplicating it and auto-connecting corresponding points"""
+        """Extrude current layer"""
         current = self.mesh_data.current_layer
         current_z = self.mesh_data.layers[current]
         
-        # Ask for new layer name and Z value
         name = simpledialog.askstring("Extrude Layer", 
                                      f"Name for extruded layer:", 
                                      initialvalue=f"{current}_extruded")
@@ -391,12 +555,10 @@ class Tab2DEditor:
         if z is None:
             return
         
-        # Create new layer with duplicate geometry
         self.mesh_data.add_layer(name, z)
         self.mesh_data.points[name] = self.mesh_data.points[current].copy()
         self.mesh_data.connections[name] = self.mesh_data.connections[current].copy()
         
-        # Auto-connect all corresponding points between layers
         num_points = len(self.mesh_data.points[current])
         for i in range(num_points):
             self.mesh_data.add_inter_layer_connection(current, i, name, i)
@@ -406,93 +568,59 @@ class Tab2DEditor:
         messagebox.showinfo("Success", f"Layer extruded: {name}\n{num_points} inter-layer connections created")
     
     def update_plot(self):
-        self.ax_2d.clear()
+        """Update 2D matplotlib plot (non-ISO mode)"""
+        if self.iso_mode:
+            return
         
+        self.ax_2d.clear()
         self.ax_2d.grid(True, alpha=0.3)
         self.ax_2d.set_xlabel("X")
         self.ax_2d.set_ylabel("Y")
         
+        layer = self.mesh_data.current_layer
+        z = self.mesh_data.layers[layer]
+        self.ax_2d.set_title(f"Layer: {layer} (z={z})")
+        
+        points = self.mesh_data.points[layer]
+        
+        # Draw connections
+        for conn in self.mesh_data.connections[layer]:
+            p1, p2 = points[conn[0]], points[conn[1]]
+            
+            if self.selected_connection and self.selected_connection == (layer, conn):
+                self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r-', linewidth=3, alpha=0.8)
+            else:
+                self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'b-', linewidth=1.5)
+        
+        # Draw points
+        if points:
+            xs, ys = zip(*points)
+            self.ax_2d.plot(xs, ys, 'ro', markersize=8)
+            
+            for idx in self.selected_points:
+                if isinstance(idx, int) and idx < len(points):
+                    self.ax_2d.plot(points[idx][0], points[idx][1], 'go', 
+                                   markersize=12, alpha=0.5)
+        
+        # Auto-scale
         all_x, all_y = [], []
-        for layer in self.mesh_data.points:
-            for x, y in self.mesh_data.points[layer]:
+        for lyr in self.mesh_data.points:
+            for x, y in self.mesh_data.points[lyr]:
                 all_x.append(x)
                 all_y.append(y)
         
         if all_x and all_y:
             min_x, max_x = min(all_x), max(all_x)
             min_y, max_y = min(all_y), max(all_y)
-            
-            range_x = max(max_x - min_x, 2)
-            range_y = max(max_y - min_y, 2)
-            
-            max_range = max(range_x, range_y)
+            range_val = max(max_x - min_x, max_y - min_y, 2)
             center_x = (max_x + min_x) / 2
             center_y = (max_y + min_y) / 2
-            
-            margin = max_range * 0.2 + 1
-            self.ax_2d.set_xlim(center_x - max_range/2 - margin, center_x + max_range/2 + margin)
-            self.ax_2d.set_ylim(center_y - max_range/2 - margin, center_y + max_range/2 + margin)
+            margin = range_val * 0.2 + 1
+            self.ax_2d.set_xlim(center_x - range_val/2 - margin, center_x + range_val/2 + margin)
+            self.ax_2d.set_ylim(center_y - range_val/2 - margin, center_y + range_val/2 + margin)
         else:
             self.ax_2d.set_xlim(-1, 1)
             self.ax_2d.set_ylim(-1, 1)
-        
-        if self.iso_mode and len(self.iso_layers) == 2:
-            self.ax_2d.set_title(f"Iso Mode: {self.iso_layers[0]} & {self.iso_layers[1]}")
-            
-            colors = ['red', 'blue']
-            for i, layer in enumerate(self.iso_layers):
-                points = self.mesh_data.points[layer]
-                
-                for conn in self.mesh_data.connections[layer]:
-                    p1, p2 = points[conn[0]], points[conn[1]]
-                    self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 
-                                   color=colors[i], linewidth=1.5, alpha=0.7)
-                
-                if points:
-                    xs, ys = zip(*points)
-                    self.ax_2d.plot(xs, ys, 'o', color=colors[i], markersize=8, 
-                                   label=f"{layer}")
-                    
-                    for selected in self.selected_points:
-                        if isinstance(selected, tuple) and selected[0] == layer:
-                            idx = selected[1]
-                            if idx < len(points):
-                                self.ax_2d.plot(points[idx][0], points[idx][1], 'go', 
-                                              markersize=15, alpha=0.6, markeredgewidth=2,
-                                              markeredgecolor='green')
-            
-            for layer1, idx1, layer2, idx2 in self.mesh_data.inter_layer_connections:
-                if layer1 in self.iso_layers and layer2 in self.iso_layers:
-                    if idx1 < len(self.mesh_data.points[layer1]) and idx2 < len(self.mesh_data.points[layer2]):
-                        p1 = self.mesh_data.points[layer1][idx1]
-                        p2 = self.mesh_data.points[layer2][idx2]
-                        self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 
-                                       'g--', linewidth=2, alpha=0.5)
-            
-            self.ax_2d.legend()
-        else:
-            layer = self.mesh_data.current_layer
-            z = self.mesh_data.layers[layer]
-            self.ax_2d.set_title(f"Layer: {layer} (z={z})")
-            
-            points = self.mesh_data.points[layer]
-            for conn in self.mesh_data.connections[layer]:
-                p1, p2 = points[conn[0]], points[conn[1]]
-                
-                # Highlight selected connection
-                if self.selected_connection and self.selected_connection == (layer, conn):
-                    self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r-', linewidth=3, alpha=0.8)
-                else:
-                    self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'b-', linewidth=1.5)
-            
-            if points:
-                xs, ys = zip(*points)
-                self.ax_2d.plot(xs, ys, 'ro', markersize=8)
-                
-                for idx in self.selected_points:
-                    if isinstance(idx, int) and idx < len(points):
-                        self.ax_2d.plot(points[idx][0], points[idx][1], 'go', 
-                                       markersize=12, alpha=0.5)
         
         self.canvas_2d.draw()
     
@@ -528,7 +656,6 @@ class Tab2DEditor:
     
     def duplicate_layer(self):
         current = self.mesh_data.current_layer
-        num = len(self.mesh_data.layers)
         
         name = simpledialog.askstring("Duplicate Layer", 
                                      f"Name for duplicated layer:", 

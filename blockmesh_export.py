@@ -1,5 +1,6 @@
 """
 Export to OpenFOAM blockMeshDict format
+Uses sequential global point numbering as required by blockMesh
 """
 
 class BlockMeshExporter:
@@ -32,11 +33,11 @@ class BlockMeshExporter:
         output.append("scale   1;")
         output.append("")
         
-        # Vertices
+        # Vertices - sequential numbering
         output.append("vertices")
         output.append("(")
-        for v in vertices:
-            output.append(f"    ({v[0]:.6f} {v[1]:.6f} {v[2]:.6f})")
+        for idx, v in enumerate(vertices):
+            output.append(f"    ({v[0]:.6f} {v[1]:.6f} {v[2]:.6f})  // Vertex {idx}")
         output.append(");")
         output.append("")
         
@@ -79,37 +80,52 @@ class BlockMeshExporter:
         return "\n".join(output)
     
     def _get_vertices(self):
-        """Extract all unique vertices"""
+        """Extract all unique vertices with sequential global numbering"""
         vertices = []
-        vertex_map = {}
+        vertex_map = {}  # (layer, local_idx) -> global_idx
         
-        idx = 0
-        for layer in sorted(self.mesh_data.layers.keys(), key=lambda l: self.mesh_data.layers[l]):
+        global_idx = 0
+        layers_sorted = sorted(self.mesh_data.layers.keys(), key=lambda l: self.mesh_data.layers[l])
+        
+        for layer in layers_sorted:
             z = self.mesh_data.layers[layer]
             for local_idx, (x, y) in enumerate(self.mesh_data.points[layer]):
-                vertices.append((x, y, z))
-                vertex_map[(layer, local_idx)] = idx
-                idx += 1
+                # Use actual 3D coordinates based on sketch plane
+                coords_3d = self.mesh_data.get_3d_coords(layer, (x, y))
+                # For blockMesh, we need actual XYZ, not the matplotlib display coords
+                # Convert back from display coords to OpenFOAM coords
+                if self.mesh_data.sketch_plane == "XY":
+                    # Display: (X, Z, Y) -> OpenFOAM: (X, Y, Z)
+                    vertices.append((coords_3d[0], coords_3d[2], coords_3d[1]))
+                elif self.mesh_data.sketch_plane == "YZ":
+                    # Display: (Z, X, Y) -> OpenFOAM: (X, Y, Z)
+                    vertices.append((coords_3d[1], coords_3d[0], coords_3d[2]))
+                elif self.mesh_data.sketch_plane == "ZX":
+                    # Display: (Y, Z, X) -> OpenFOAM: (X, Y, Z)
+                    vertices.append((coords_3d[2], coords_3d[0], coords_3d[1]))
+                else:
+                    vertices.append((x, y, z))
+                
+                vertex_map[(layer, local_idx)] = global_idx
+                global_idx += 1
                 
         return vertices, vertex_map
     
     def _get_blocks(self, vertex_map):
-        """Generate blocks (hexahedral cells)"""
+        """Generate blocks (hexahedral cells) using global sequential indices"""
         blocks = []
         
-        # For a proper blockMesh, we need to identify hexahedral blocks
-        # This is a simplified version - assumes structured connectivity
         layers_sorted = sorted(self.mesh_data.layers.keys(), key=lambda l: self.mesh_data.layers[l])
         
-        # Example: If we have connections forming quads in each layer
-        # and matching quads in adjacent layers, we can form hex blocks
-        
+        # For each pair of adjacent layers
         for i in range(len(layers_sorted) - 1):
             layer1 = layers_sorted[i]
             layer2 = layers_sorted[i + 1]
             
             # Simplified: assume first 4 points form a quad
+            # In a real implementation, you'd detect quads from the connection topology
             if len(self.mesh_data.points[layer1]) >= 4 and len(self.mesh_data.points[layer2]) >= 4:
+                # Use global sequential indices
                 v0 = vertex_map[(layer1, 0)]
                 v1 = vertex_map[(layer1, 1)]
                 v2 = vertex_map[(layer1, 2)]
@@ -127,15 +143,15 @@ class BlockMeshExporter:
         return blocks
     
     def _get_patches(self, vertex_map):
-        """Generate boundary patches"""
+        """Generate boundary patches using global sequential indices"""
         patches = []
         
         # Add user-defined patches
         for patch_name, patch_type, face_indices in self.mesh_data.patches:
             faces = []
             for face_idx in face_indices:
-                # Convert face indices to vertex indices
-                # This is simplified
+                # Convert face indices to global vertex indices
+                # This is simplified - needs proper face to vertex mapping
                 faces.append(f"(0 1 2 3)")  # Placeholder
             
             patches.append({

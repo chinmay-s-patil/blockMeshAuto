@@ -13,6 +13,7 @@ class Tab2DEditor:
         self.parent = parent_frame
         self.mesh_data = mesh_data
         self.selected_points = []
+        self.selected_connection = None
         self.mode = "select"
         self.iso_mode = False
         self.iso_layers = []
@@ -54,7 +55,7 @@ class Tab2DEditor:
         mode_frame = tk.LabelFrame(parent, text="Mode", padx=10, pady=10)
         mode_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        self.select_btn = tk.Button(mode_frame, text="Select Points (Connect)", 
+        self.select_btn = tk.Button(mode_frame, text="Select Points", 
                                      command=lambda: self.set_mode("select"), 
                                      relief=tk.SUNKEN, bg="lightblue")
         self.select_btn.pack(fill=tk.X, pady=2)
@@ -83,9 +84,10 @@ class Tab2DEditor:
         layer_btn_frame = tk.Frame(layer_frame)
         layer_btn_frame.pack(fill=tk.X, pady=(5, 0))
         
-        tk.Button(layer_btn_frame, text="Add", command=self.add_layer, width=6).pack(side=tk.LEFT, padx=1)
-        tk.Button(layer_btn_frame, text="Duplicate", command=self.duplicate_layer, width=8).pack(side=tk.LEFT, padx=1)
-        tk.Button(layer_btn_frame, text="Remove", command=self.remove_layer, width=7).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Add", command=self.add_layer, width=5).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Duplicate", command=self.duplicate_layer, width=7).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Extrude", command=self.extrude_layer, width=6).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Remove", command=self.remove_layer, width=6).pack(side=tk.LEFT, padx=1)
         
         self.layer_info = tk.Label(layer_frame, text=f"Current: {self.mesh_data.current_layer}", 
                                    font=("Arial", 9, "bold"), fg="blue")
@@ -139,7 +141,9 @@ class Tab2DEditor:
         self.selection_label.pack()
         
         tk.Button(conn_frame, text="Create Connection", 
-                 command=self.create_connection).pack(fill=tk.X, pady=2)
+                 command=self.create_connection, bg="lightgreen").pack(fill=tk.X, pady=2)
+        tk.Button(conn_frame, text="Delete Connection", 
+                 command=self.delete_connection, bg="salmon").pack(fill=tk.X, pady=2)
         tk.Button(conn_frame, text="Clear Selection", 
                  command=self.clear_selection).pack(fill=tk.X, pady=2)
     
@@ -214,6 +218,15 @@ class Tab2DEditor:
         layer = self.mesh_data.current_layer
         points = self.mesh_data.points[layer]
         
+        # Check if clicking near a connection for deletion
+        if self.mode == "select":
+            clicked_conn = self._find_connection_near_point(x, y, layer)
+            if clicked_conn is not None:
+                self.selected_connection = (layer, clicked_conn)
+                self.selection_label.config(text=f"Selected connection: {clicked_conn}")
+                self.update_plot()
+                return
+        
         clicked_idx = None
         for idx, (px, py) in enumerate(points):
             dist = np.sqrt((px - x)**2 + (py - y)**2)
@@ -234,9 +247,41 @@ class Tab2DEditor:
                     self.selected_points.append(clicked_idx)
                     if len(self.selected_points) > 2:
                         self.selected_points.pop(0)
-                self.selection_label.config(text=f"Selected: {self.selected_points}")
+                self.selected_connection = None
+                self.selection_label.config(text=f"Selected points: {self.selected_points}")
         
         self.update_plot()
+    
+    def _find_connection_near_point(self, x, y, layer):
+        """Find if click is near a connection line"""
+        points = self.mesh_data.points[layer]
+        threshold = 0.3
+        
+        for conn in self.mesh_data.connections[layer]:
+            p1 = np.array(points[conn[0]])
+            p2 = np.array(points[conn[1]])
+            click = np.array([x, y])
+            
+            # Distance from point to line segment
+            line_vec = p2 - p1
+            line_len = np.linalg.norm(line_vec)
+            if line_len < 1e-6:
+                continue
+            
+            line_unitvec = line_vec / line_len
+            point_vec = click - p1
+            proj_length = np.dot(point_vec, line_unitvec)
+            
+            if proj_length < 0 or proj_length > line_len:
+                continue
+            
+            proj_point = p1 + proj_length * line_unitvec
+            dist = np.linalg.norm(click - proj_point)
+            
+            if dist < threshold:
+                return conn
+        
+        return None
     
     def handle_iso_click(self, x, y):
         min_dist = float('inf')
@@ -295,14 +340,62 @@ class Tab2DEditor:
             self.mesh_data.add_connection(self.mesh_data.current_layer, 
                                          self.selected_points[0], 
                                          self.selected_points[1])
+            messagebox.showinfo("Success", "Connection created")
         
         self.clear_selection()
         self.update_plot()
     
+    def delete_connection(self):
+        """Delete the selected connection"""
+        if self.selected_connection is None:
+            messagebox.showwarning("Warning", "No connection selected. Click near a connection line to select it.")
+            return
+        
+        layer, conn = self.selected_connection
+        if conn in self.mesh_data.connections[layer]:
+            self.mesh_data.connections[layer].remove(conn)
+            messagebox.showinfo("Success", f"Connection {conn} deleted from {layer}")
+            self.selected_connection = None
+            self.update_plot()
+        else:
+            messagebox.showerror("Error", "Connection not found")
+    
     def clear_selection(self):
         self.selected_points = []
+        self.selected_connection = None
         self.selection_label.config(text="Selected: None")
         self.update_plot()
+    
+    def extrude_layer(self):
+        """Extrude current layer by duplicating it and auto-connecting corresponding points"""
+        current = self.mesh_data.current_layer
+        current_z = self.mesh_data.layers[current]
+        
+        # Ask for new layer name and Z value
+        name = simpledialog.askstring("Extrude Layer", 
+                                     f"Name for extruded layer:", 
+                                     initialvalue=f"{current}_extruded")
+        if not name:
+            return
+        
+        z = simpledialog.askfloat("Z Value", f"Z-value for {name}:", 
+                                 initialvalue=current_z + 1.0)
+        if z is None:
+            return
+        
+        # Create new layer with duplicate geometry
+        self.mesh_data.add_layer(name, z)
+        self.mesh_data.points[name] = self.mesh_data.points[current].copy()
+        self.mesh_data.connections[name] = self.mesh_data.connections[current].copy()
+        
+        # Auto-connect all corresponding points between layers
+        num_points = len(self.mesh_data.points[current])
+        for i in range(num_points):
+            self.mesh_data.add_inter_layer_connection(current, i, name, i)
+        
+        self.update_layer_list()
+        self.update_iso_checkboxes()
+        messagebox.showinfo("Success", f"Layer extruded: {name}\n{num_points} inter-layer connections created")
     
     def update_plot(self):
         self.ax_2d.clear()
@@ -377,7 +470,12 @@ class Tab2DEditor:
             points = self.mesh_data.points[layer]
             for conn in self.mesh_data.connections[layer]:
                 p1, p2 = points[conn[0]], points[conn[1]]
-                self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'b-', linewidth=1.5)
+                
+                # Highlight selected connection
+                if self.selected_connection and self.selected_connection == (layer, conn):
+                    self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r-', linewidth=3, alpha=0.8)
+                else:
+                    self.ax_2d.plot([p1[0], p2[0]], [p1[1], p2[1]], 'b-', linewidth=1.5)
             
             if points:
                 xs, ys = zip(*points)

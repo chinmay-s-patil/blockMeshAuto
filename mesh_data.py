@@ -58,6 +58,32 @@ class MeshData:
         if conn not in self.inter_layer_connections:
             self.inter_layer_connections.append(conn)
     
+    def get_global_point_index(self, layer, local_idx):
+        """Convert layer-local point index to global sequential index"""
+        global_idx = 0
+        layers_sorted = sorted(self.layers.keys(), key=lambda l: self.layers[l])
+        
+        for lyr in layers_sorted:
+            if lyr == layer:
+                return global_idx + local_idx
+            global_idx += len(self.points[lyr])
+        
+        return -1  # Not found
+    
+    def get_layer_from_global_index(self, global_idx):
+        """Get layer and local index from global sequential index"""
+        current_idx = 0
+        layers_sorted = sorted(self.layers.keys(), key=lambda l: self.layers[l])
+        
+        for layer in layers_sorted:
+            num_points = len(self.points[layer])
+            if global_idx < current_idx + num_points:
+                local_idx = global_idx - current_idx
+                return layer, local_idx
+            current_idx += num_points
+        
+        return None, -1
+    
     def get_3d_coords(self, layer, point_2d):
         """Convert 2D sketch coords to 3D based on sketch plane"""
         x, y = point_2d
@@ -74,14 +100,25 @@ class MeshData:
             return (y, z, x)  # Returns (X=Z, Z=X, Y=depth)
         
         return (x, z, y)  # Default XY
+    
+    def get_3d_coords_from_global(self, global_idx):
+        """Get 3D coordinates from global point index"""
+        layer, local_idx = self.get_layer_from_global_index(global_idx)
+        if layer is None:
+            return None
+        
+        point_2d = self.points[layer][local_idx]
+        return self.get_3d_coords(layer, point_2d)
             
     def get_all_3d_points(self):
-        """Get all points with their 3D coordinates"""
+        """Get all points with their 3D coordinates in sequential order"""
         points_3d = []
-        point_map = {}  # (layer, idx) -> global_idx
+        point_map = {}  # (layer, local_idx) -> global_idx
         
         global_idx = 0
-        for layer in sorted(self.layers.keys(), key=lambda l: self.layers[l]):
+        layers_sorted = sorted(self.layers.keys(), key=lambda l: self.layers[l])
+        
+        for layer in layers_sorted:
             for local_idx, point_2d in enumerate(self.points[layer]):
                 coords_3d = self.get_3d_coords(layer, point_2d)
                 points_3d.append(coords_3d)
@@ -89,6 +126,10 @@ class MeshData:
                 global_idx += 1
                 
         return points_3d, point_map
+    
+    def get_total_points(self):
+        """Get total number of points across all layers"""
+        return sum(len(pts) for pts in self.points.values())
     
     def get_faces(self):
         """Get all quadrilateral faces for patch selection"""

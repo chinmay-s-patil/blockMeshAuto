@@ -8,9 +8,8 @@ import json
 import os
 
 from mesh_data import MeshData
-from tab1_project_settings import TabProjectSettings
-from tab2_2d_editor import Tab2DEditor
-from tab3_grid_sizing import TabGridSizing
+from tab1_projectSettings.tab1_main import TabProjectSettings
+from tab2_2DEditor.tab2_main import Tab2DEditor
 from tab3_hex_creation import TabHexBlockMaking
 from tab4_3d_patches import Tab3DPatches
 from tab5_export import TabExport

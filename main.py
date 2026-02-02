@@ -2,6 +2,13 @@
 OpenFOAM blockMesh Builder - Main Application
 Modularized version with separated tab components
 """
+
+import os
+os.environ['PYVISTA_TRAME'] = 'false'  # Different variable name
+os.environ['PYVISTA_TRAME_SERVER'] = 'false'
+
+
+
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import json
@@ -10,7 +17,7 @@ import os
 from mesh_data import MeshData
 from tab1_projectSettings.tab1_main import TabProjectSettings
 from tab2_2DEditor.tab2_main import Tab2DEditor
-from tab3_hex_creation import TabHexBlockMaking
+from tab3_Hex.tab3_main import TabHexBlockMaking
 from tab4_3d_patches import Tab3DPatches
 from tab5_export import TabExport
 

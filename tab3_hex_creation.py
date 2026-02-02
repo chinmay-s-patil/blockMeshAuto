@@ -14,18 +14,25 @@ import time
 
 
 class PyVistaHexViewer:
-    """PyVista-based 3D viewer with point picking"""
+    """PyVista-based 3D viewer with point picking - FIXED for Tkinter compatibility"""
     def __init__(self, mesh_data, parent_tab):
         self.mesh_data = mesh_data
-        self.parent = parent_tab
+        self.parent = parent_tab  # Tkinter parent widget
         self.plotter = None
         self.selected_points = set()  # Global indices
         self.hidden_points = set()
         self._setup_plotter()
         
+        # Start update pump from Tkinter's main loop (NO THREADING)
+        self._pump_pyvista()
+        
     def _setup_plotter(self):
         """Initialize PyVista plotter"""
-        self.plotter = pv.Plotter(title="3D Hex Block Builder - Click to Select Points")
+        self.plotter = pv.Plotter(
+            title="3D Hex Block Builder - Click to Toggle Points",
+            window_size=[800, 600],
+            off_screen=False
+        )
         self.plotter.background_color = 'white'
         
         # Enable point picking (click to pick)
@@ -37,23 +44,16 @@ class PyVistaHexViewer:
             tolerance=0.01
         )
         
-        # Set interaction style
-        self.plotter.track_mouse_position()
+        # Show in non-blocking mode
+        self.plotter.show(interactive=False, auto_close=False)
         
-        # Show in non-blocking mode so Tkinter stays responsive
-        self.plotter.show(interactive=False, interactive_update=True)
-        
-        # Start update loop
-        self._running = True
-        self._update_thread = threading.Thread(target=self._update_loop, daemon=True)
-        self._update_thread.start()
-        
-    def _update_loop(self):
-        """Keep PyVista rendering while Tkinter runs"""
-        while self._running:
+    def _pump_pyvista(self):
+        """Update PyVista window from Tkinter's main loop"""
+        if self.plotter and not self.plotter._closed:
             self.plotter.update()
-            time.sleep(0.03)  # ~30 FPS
-            
+        # Schedule next update in 50ms (~20 FPS)
+        self.parent.after(50, self._pump_pyvista)
+        
     def _on_point_click(self, point):
         """Handle point picking - toggle selection"""
         if point is None:
@@ -68,14 +68,14 @@ class PyVistaHexViewer:
         if global_idx in self.selected_points:
             self.selected_points.remove(global_idx)
         else:
-            if len(self.selected_points) < 8:  # Enforce 8-point limit
+            if len(self.selected_points) < 8:
                 self.selected_points.add(global_idx)
             else:
                 messagebox.showwarning("Limit", "Maximum 8 points allowed")
                 return
         
-        # Update parent UI
-        self.parent.after(0, self.parent.on_selection_changed, self.selected_points.copy())
+        # Update parent UI (use tkinter's thread-safe method)
+        self.parent.after(0, lambda: self.parent.on_selection_changed(self.selected_points.copy()))
         self.draw()
         
     def _find_closest_global_point(self, coord):
@@ -84,7 +84,6 @@ class PyVistaHexViewer:
         min_dist = float('inf')
         closest_idx = None
         
-        # Build coordinate list if not cached
         if not hasattr(self, '_global_coords'):
             self._rebuild_coord_cache()
             
@@ -92,7 +91,7 @@ class PyVistaHexViewer:
             if idx in self.hidden_points:
                 continue
             dist = np.linalg.norm(pt_coord - coord)
-            if dist < min_dist and dist < 0.5:  # 0.5 unit tolerance
+            if dist < min_dist and dist < 0.5:
                 min_dist = dist
                 closest_idx = idx
                 
@@ -101,7 +100,7 @@ class PyVistaHexViewer:
     def _rebuild_coord_cache(self):
         """Cache all global point coordinates"""
         coords = []
-        self._global_to_local = {}  # global_idx -> (layer, local_idx)
+        self._global_to_local = {}
         
         idx = 0
         for layer_name in sorted(self.mesh_data.layers.keys(), 
@@ -140,12 +139,15 @@ class PyVistaHexViewer:
         self.draw()
         
     def set_selection(self, global_indices):
-        """Set selection from outside (e.g., Tkinter listbox)"""
+        """Set selection from outside"""
         self.selected_points = set(global_indices)
         self.draw()
         
     def draw(self):
         """Redraw the 3D scene"""
+        if not self.plotter or self.plotter._closed:
+            return
+            
         self.plotter.clear()
         self._rebuild_coord_cache()
         
@@ -153,20 +155,15 @@ class PyVistaHexViewer:
             self.plotter.add_text("No points to display", font_size=20)
             return
             
-        # Split points by layer for coloring
-        layer_colors = {}
+        # Colors for layers
         color_map = ['red', 'blue', 'green', 'orange', 'purple', 'cyan']
-        
-        points_by_state = {
-            'selected': [],
-            'visible': {i: [] for i in range(len(self.mesh_data.layers))},
-            'hidden': []
-        }
-        
-        # Organize points
         layer_list = sorted(self.mesh_data.layers.keys(), 
                            key=lambda x: self.mesh_data.layers[x])
         layer_to_idx = {name: i for i, name in enumerate(layer_list)}
+        
+        # Organize points by state
+        visible_by_layer = {i: [] for i in range(len(self.mesh_data.layers))}
+        selected_list = []
         
         for global_idx, coord in enumerate(self._global_coords):
             if global_idx in self.hidden_points:
@@ -176,12 +173,12 @@ class PyVistaHexViewer:
             layer_idx = layer_to_idx[layer_name]
             
             if global_idx in self.selected_points:
-                points_by_state['selected'].append((global_idx, coord, layer_name))
+                selected_list.append((global_idx, coord))
             else:
-                points_by_state['visible'][layer_idx].append((global_idx, coord))
+                visible_by_layer[layer_idx].append((global_idx, coord))
                 
-        # Draw unselected points (colored by layer)
-        for layer_idx, pts in points_by_state['visible'].items():
+        # Draw unselected points by layer
+        for layer_idx, pts in visible_by_layer.items():
             if not pts:
                 continue
             coords = np.array([p[1] for p in pts])
@@ -189,22 +186,25 @@ class PyVistaHexViewer:
             color = color_map[layer_idx % len(color_map)]
             self.plotter.add_points(cloud, color=color, point_size=10, 
                                    render_points_as_spheres=True)
-            # Add labels with global indices
+            # Labels
             labels = [str(p[0]) for p in pts]
-            self.plotter.add_point_labels(coords, labels, font_size=10, 
-                                         text_color=color, show_points=False)
+            if len(labels) > 0:
+                self.plotter.add_point_labels(coords, labels, font_size=10, 
+                                             text_color=color, show_points=False,
+                                             shape_opacity=0.3, font_family='courier')
         
-        # Draw selected points (lime green, larger)
-        if points_by_state['selected']:
-            coords = np.array([p[1] for p in points_by_state['selected']])
+        # Draw selected points (lime, larger)
+        if selected_list:
+            coords = np.array([p[1] for p in selected_list])
             cloud = pv.PolyData(coords)
             self.plotter.add_points(cloud, color='lime', point_size=15, 
                                    render_points_as_spheres=True)
-            labels = [f"{p[0]}*" for p in points_by_state['selected']]
+            labels = [f"{p[0]}*" for p in selected_list]
             self.plotter.add_point_labels(coords, labels, font_size=12, 
-                                         text_color='darkgreen', show_points=False)
+                                         text_color='darkgreen', show_points=False,
+                                         shape_color='lightgreen', shape_opacity=0.5)
         
-        # Draw connections within layers
+        # Draw connections
         for layer_name in layer_list:
             if layer_name not in self.mesh_data.connections:
                 continue
@@ -216,11 +216,11 @@ class PyVistaHexViewer:
                 p1_global = self._local_to_global(layer_name, p1_local)
                 p2_global = self._local_to_global(layer_name, p2_local)
                 
-                # Skip if either point is hidden
                 if p1_global in self.hidden_points or p2_global in self.hidden_points:
                     continue
                     
-                if p1_global < len(self._global_coords) and p2_global < len(self._global_coords):
+                if (p1_global < len(self._global_coords) and 
+                    p2_global < len(self._global_coords)):
                     line = pv.Line(self._global_coords[p1_global], 
                                   self._global_coords[p2_global])
                     self.plotter.add_mesh(line, color=color, line_width=3)
@@ -235,42 +235,42 @@ class PyVistaHexViewer:
                 
             if g1 < len(self._global_coords) and g2 < len(self._global_coords):
                 line = pv.Line(self._global_coords[g1], self._global_coords[g2])
-                self.plotter.add_mesh(line, color='gray', line_width=2, opacity=0.5)
+                self.plotter.add_mesh(line, color='gray', line_width=2)
         
-        # Draw hex blocks as wireframes
+        # Draw hex blocks
         for block in getattr(self.parent, 'hex_blocks', []):
             verts = block['vertices']
-            # Draw edges
+            # Edges
             edges = [(0,1),(1,2),(2,3),(3,0),(4,5),(5,6),(6,7),(7,4),
                     (0,4),(1,5),(2,6),(3,7)]
             for i, j in edges:
                 line = pv.Line(verts[i], verts[j])
                 self.plotter.add_mesh(line, color='darkgreen', line_width=4)
             
-            # Draw translucent faces
+            # Faces (translucent)
             faces = [
                 [verts[0], verts[1], verts[2], verts[3]],
-                [verts[4], verts[5], verts[6], verts[7]],
+                [verts[4], verts[5], verts[6], verts[7]], 
                 [verts[0], verts[1], verts[5], verts[4]],
                 [verts[2], verts[3], verts[7], verts[6]],
                 [verts[1], verts[2], verts[6], verts[5]],
                 [verts[0], verts[3], verts[7], verts[4]]
             ]
             for face in faces:
-                face_mesh = pv.Polygon(face)
-                self.plotter.add_mesh(face_mesh, color='lightgreen', opacity=0.2, 
-                                    show_edges=False)
+                if len(face) == 4:
+                    face_mesh = pv.Rectangle(face)
+                    self.plotter.add_mesh(face_mesh, color='lightgreen', 
+                                        opacity=0.2, show_edges=True, 
+                                        edge_color='green', line_width=1)
         
-        # Add instructions
-        self.plotter.add_text("Click: Select/Deselect | Right-drag: Pan | Left-drag: Rotate", 
+        # Instructions
+        self.plotter.add_text("Click: Toggle Select | Drag: Rotate/Pan | Scroll: Zoom", 
                              position='lower_left', font_size=10, color='black')
         
         self.plotter.render()
         
     def _local_to_global(self, layer_name, local_idx):
         """Convert local index to global index"""
-        # This is the reverse of get_layer_from_global_index
-        # We need to calculate it based on layer order
         layer_list = sorted(self.mesh_data.layers.keys(), 
                            key=lambda x: self.mesh_data.layers[x])
         offset = 0
@@ -282,14 +282,14 @@ class PyVistaHexViewer:
         
     def reset_view(self):
         """Reset camera"""
-        self.plotter.reset_camera()
+        if self.plotter:
+            self.plotter.reset_camera()
+            self.plotter.render()
         
     def close(self):
         """Cleanup"""
-        self._running = False
         if self.plotter:
             self.plotter.close()
-
 
 class TabHexBlockMaking:
     def __init__(self, parent_frame, mesh_data):
@@ -417,8 +417,8 @@ class TabHexBlockMaking:
         tk.Button(btn_frame2, text="Clear All", command=self.clear_all_blocks,
                  bg="lightcoral", width=12).pack(side=tk.LEFT, padx=2)
         
-        # Initialize viewer
-        self.viewer = PyVistaHexViewer(self.mesh_data, self)
+        # Change this line in TabHexBlockMaking.setup_ui():
+        self.viewer = PyVistaHexViewer(self.mesh_data, self.parent)
         self.update_layer_info()
         
     def update_layer_info(self):

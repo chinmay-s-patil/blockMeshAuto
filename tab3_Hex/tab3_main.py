@@ -1,5 +1,9 @@
 """
 Hex Block Making Tab - With embedded 3D viewer and 4 sub-tabs
+Vertex Order for Hex Block (OpenFOAM standard):
+    Bottom face (z=min): 0-1-2-3 (counter-clockwise when viewed from -z)
+    Top face (z=max): 4-5-6-7 (counter-clockwise when viewed from +z)
+    Vertical edges: 0-4, 1-5, 2-6, 3-7
 """
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
@@ -53,18 +57,11 @@ class TabHexBlockMaking:
         # Initialize embedded viewer
         self.viewer = EmbeddedPyVistaViewer(viewer_frame, self.mesh_data, self)
         
-        # Controls below canvas
+        # Info label at bottom of viewer (no reset/refresh buttons here anymore)
         control_frame = tk.Frame(left_frame)
         control_frame.pack(fill=tk.X, pady=5)
         
-        tk.Button(control_frame, text="🔄 Reset View",
-                 command=self.reset_view, width=12,
-                 bg="lightblue", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="🔁 Refresh View",
-                 command=self.refresh_view, width=12,
-                 bg="lightgreen", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
-        
-        tk.Label(control_frame, text="Mouse: Left-Rotate | Right-Pan | Scroll-Zoom | Click: Select",
+        tk.Label(control_frame, text="Mouse: Left-Rotate | Right-Pan | Scroll-Zoom | Click: Select | Order: Bottom CCW, Top CCW",
                 font=("Arial", 9), fg="gray").pack(side=tk.LEFT, padx=10)
         
         # Right: Tabbed controls (The 4 tabs like old code)
@@ -115,6 +112,9 @@ class TabHexBlockMaking:
         # Custom binding for toggle selection without Ctrl
         self.layer_listbox.bind('<Button-1>', self._on_layer_click)
         
+        # LAYER FILTERING: Also update viewer when selection changes
+        self.layer_listbox.bind('<<ListboxSelect>>', self._on_layer_selection_changed)
+        
         self.layer_status = tk.Label(frame, text="Select layers to visualize",
                                      fg="gray", font=("Arial", 9, "italic"))
         self.layer_status.pack(pady=10)
@@ -126,8 +126,21 @@ class TabHexBlockMaking:
         tk.Button(btn_frame, text="Clear All", command=self._clear_all_layers,
                  bg="lightgray", font=("Arial", 9)).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
         
-        tk.Label(frame, text="Note: Click directly in 3D view to select points.\nPoints are numbered globally (continuous).",
-                font=("Arial", 8), fg="blue", justify=tk.CENTER).pack(pady=10)
+        # Cube vertex order explanation
+        help_text = """Vertex Selection Order for Cube:
+        
+  7--------6         Select 4 points on BOTTOM layer
+  /|       /|         (counter-clockwise looking down)
+ 4--------5 |         
+ | |      | |         Then 4 points on TOP layer  
+ | 3------|-2         (counter-clockwise looking down)
+ |/       |/          
+ 0--------1           
+                      
+Click in 3D view to select points (max 8)."""
+        
+        tk.Label(frame, text=help_text,
+                font=("Courier", 9), fg="darkblue", justify=tk.LEFT, bg='#f0f0f0').pack(pady=10, fill=tk.X)
     
     def _on_layer_click(self, event):
         """Toggle layer selection on single click without requiring Ctrl"""
@@ -138,11 +151,38 @@ class TabHexBlockMaking:
             self.layer_listbox.selection_set(index)
         return "break"  # Prevent default handling
     
+    def _on_layer_selection_changed(self, event=None):
+        """LAYER FILTERING: Update viewer when layer selection changes"""
+        if not self.viewer:
+            return
+            
+        # Get selected layer names from listbox
+        selected_indices = self.layer_listbox.curselection()
+        selected_layers = []
+        
+        # Get layer names from the listbox entries
+        for i in selected_indices:
+            layer_text = self.layer_listbox.get(i)
+            # Extract layer name from text like "Layer 0 (z=0.0, 24 pts)"
+            layer_name = layer_text.split(' (')[0]
+            selected_layers.append(layer_name)
+        
+        # Update viewer with selected layers
+        self.viewer.set_visible_layers(selected_layers)
+        
+        # Update status label
+        if selected_layers:
+            self.layer_status.config(text=f"Showing {len(selected_layers)} layer(s): {', '.join(selected_layers)}")
+        else:
+            self.layer_status.config(text="No layers selected - showing all")
+    
     def _select_all_layers(self):
         self.layer_listbox.select_set(0, tk.END)
+        self._on_layer_selection_changed()  # LAYER FILTERING: Update viewer
     
     def _clear_all_layers(self):
         self.layer_listbox.selection_clear(0, tk.END)
+        self._on_layer_selection_changed()  # LAYER FILTERING: Update viewer
         
     def _setup_points_tab(self):
         """Setup the Points selection tab"""
@@ -154,7 +194,10 @@ class TabHexBlockMaking:
         
         info_text = """Click points in 3D view to toggle selection.
 Select exactly 8 points (4 from bottom layer, 4 from top layer).
-Order: counter-clockwise on bottom, then counter-clockwise on top."""
+
+ORDER MATTERS for hex block:
+Bottom layer: 0→1→2→3 (counter-clockwise, viewed from below)
+Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         
         tk.Label(frame, text=info_text, font=("Arial", 9), justify=tk.LEFT, fg="gray").pack(anchor=tk.W, pady=(0, 10))
         
@@ -316,9 +359,11 @@ Order: counter-clockwise on bottom, then counter-clockwise on top."""
         for name, z in sorted(self.mesh_data.layers.items(), key=lambda x: x[1]):
             num_points = len(self.mesh_data.points[name])
             self.layer_listbox.insert(tk.END, f"{name} (z={z}, {num_points} pts)")
-        if self.viewer:
-            self.viewer.draw()
-    
+        
+        # LAYER FILTERING: Select all layers by default
+        self.layer_listbox.select_set(0, tk.END)
+        self._on_layer_selection_changed()  # Update viewer with all layers
+        
     def reset_view(self):
         """Reset 3D view"""
         if self.viewer:
@@ -375,7 +420,8 @@ Order: counter-clockwise on bottom, then counter-clockwise on top."""
             messagebox.showwarning("Warning", f"Need exactly 8 points, have {len(self.selected_points)}")
             return
         
-        # Get coordinates
+        # Get coordinates in the order they were selected
+        # The user selects in order: 0,1,2,3 on bottom then 4,5,6,7 on top
         vertices = []
         layers_used = set()
         
@@ -387,7 +433,19 @@ Order: counter-clockwise on bottom, then counter-clockwise on top."""
             vertices.append(coords_3d)
         
         if len(layers_used) != 2:
-            messagebox.showerror("Error", "Points must come from exactly 2 layers")
+            messagebox.showerror("Error", "Points must come from exactly 2 layers (4 bottom, 4 top)")
+            return
+        
+        # Validate vertex ordering
+        # vertices[0:4] should be bottom layer, vertices[4:8] should be top layer
+        z_coords = [v[2] for v in vertices]
+        z_bottom_avg = sum(z_coords[0:4]) / 4
+        z_top_avg = sum(z_coords[4:8]) / 4
+        
+        if z_bottom_avg >= z_top_avg:
+            messagebox.showerror("Error", 
+                "First 4 points must be on the bottom layer (lower Z),\\n"
+                "and last 4 points must be on the top layer (higher Z)")
             return
         
         # Calculate divisions
@@ -421,16 +479,22 @@ Order: counter-clockwise on bottom, then counter-clockwise on top."""
         self.clear_point_selection()
         if self.viewer:
             self.viewer.draw()
-        messagebox.showinfo("Success", f"Block created!\nDivisions: {nx}×{ny}×{nz}")
+        messagebox.showinfo("Success", f"Hex Block created!\\n\\n"
+                           f"Vertex order: 0-1-2-3 (bottom), 4-5-6-7 (top)\\n"
+                           f"Divisions: {nx}×{ny}×{nz}\\n"
+                           f"Grading: ({self.grading_x.get()}, {self.grading_y.get()}, {self.grading_z.get()})")
     
     def _calculate_divisions(self, vertices, cell_size):
         """Calculate divisions from cell size"""
+        # X edges: 0-1, 3-2, 4-5, 7-6 (horizontal in X direction)
         x_edges = [np.linalg.norm(np.array(vertices[i]) - np.array(vertices[j]))
-                   for i, j in [(0,1),(2,3),(4,5),(6,7)]]
+                   for i, j in [(0,1), (2,3), (4,5), (6,7)]]
+        # Y edges: 1-2, 0-3, 5-6, 4-7 (horizontal in Y direction)  
         y_edges = [np.linalg.norm(np.array(vertices[i]) - np.array(vertices[j]))
-                   for i, j in [(1,2),(0,3),(5,6),(4,7)]]
+                   for i, j in [(1,2), (0,3), (5,6), (4,7)]]
+        # Z edges: 0-4, 1-5, 2-6, 3-7 (vertical)
         z_edges = [np.linalg.norm(np.array(vertices[i]) - np.array(vertices[j]))
-                   for i, j in [(0,4),(1,5),(2,6),(3,7)]]
+                   for i, j in [(0,4), (1,5), (2,6), (3,7)]]
         
         nx = max(1, int(round(np.mean(x_edges) / cell_size)))
         ny = max(1, int(round(np.mean(y_edges) / cell_size)))
@@ -453,7 +517,7 @@ Order: counter-clockwise on bottom, then counter-clockwise on top."""
             # Show block info
             block = self.hex_blocks[self.current_block_idx]
             verts = block['vertices']
-            info = f"Vertices: {len(verts)}\nDivisions: {block['divisions']}\nGrading: {block['grading_params']}"
+            info = f"Vertices: {len(verts)}\\nDivisions: {block['divisions']}\\nGrading: {block['grading_params']}"
             self.block_info.config(text=info)
     
     def delete_block(self):
@@ -489,3 +553,4 @@ Order: counter-clockwise on bottom, then counter-clockwise on top."""
         """Call when closing"""
         if self.viewer:
             self.viewer.close()
+            

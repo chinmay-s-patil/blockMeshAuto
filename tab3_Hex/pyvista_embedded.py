@@ -2,7 +2,11 @@
 Embedded 3D Viewer for Tkinter - Pure Tkinter implementation
 No PyVista, No VTK, No Matplotlib, No Plotly
 Dark Mode with View Controls and Rotating Axes
-HANDLES: XZ plane input (Y is layer/height), displays as standard XYZ
+
+Coordinate System Handling:
+- Reads sketch_plane from mesh_data to determine transformation
+- XY plane: points are (x,y), layer is z -> 3D is (x, y, z)
+- XZ plane: points are (x,z), layer is y -> 3D is (x, y, z) [swapped]
 """
 import tkinter as tk
 from tkinter import messagebox
@@ -17,8 +21,14 @@ class EmbeddedPyVistaViewer:
         self.mesh_data = mesh_data
         self.parent_tab = parent_tab
         
+        # Get sketch plane from mesh data
+        self.sketch_plane = getattr(mesh_data, 'sketch_plane', 'XY')
+        
         self.selected_points = set()  # Global indices
         self.hidden_points = set()
+        
+        # LAYER FILTERING: Track which layers are visible
+        self.visible_layers = set()  # Will be populated with all layers initially
         
         # 3D view parameters
         self.rotation_x = 30  # degrees
@@ -26,6 +36,10 @@ class EmbeddedPyVistaViewer:
         self.zoom = 1.0
         self.pan_x = 0
         self.pan_y = 0
+        
+        # Track current view state for toggling
+        self._current_view = None  # 'x', 'y', 'z', or 'iso'
+        self._view_positive = True  # True for +ve, False for -ve
         
         # Mouse interaction state
         self._drag_data = {"x": 0, "y": 0, "action": None}
@@ -61,15 +75,35 @@ class EmbeddedPyVistaViewer:
         btn_style = {'bg': '#404040', 'fg': 'white', 'relief': tk.FLAT, 
                     'font': ('Arial', 9, 'bold'), 'padx': 8, 'pady': 2}
         
+        # Fit All button
         tk.Button(self.toolbar, text="Fit All", command=self.fit_all, **btn_style).pack(side=tk.LEFT, padx=2, pady=2)
-        tk.Frame(self.toolbar, bg='#2d2d2d', width=20).pack(side=tk.LEFT)
         
+        # Separator
+        tk.Frame(self.toolbar, bg='#555555', width=2, height=20).pack(side=tk.LEFT, padx=5, pady=2)
+        
+        # Reset and Refresh buttons
+        tk.Button(self.toolbar, text="⟲ Reset", command=self.reset_view, **btn_style).pack(side=tk.LEFT, padx=2, pady=2)
+        tk.Button(self.toolbar, text="⟳ Refresh", command=self.refresh, **btn_style).pack(side=tk.LEFT, padx=2, pady=2)
+        
+        # Separator
+        tk.Frame(self.toolbar, bg='#555555', width=2, height=20).pack(side=tk.LEFT, padx=5, pady=2)
+        
+        # View buttons with toggle functionality
         tk.Label(self.toolbar, text="Views:", bg='#2d2d2d', fg='white', font=('Arial', 9)).pack(side=tk.LEFT)
         
-        tk.Button(self.toolbar, text="X", command=lambda: self.set_view('x'), **btn_style).pack(side=tk.LEFT, padx=1)
-        tk.Button(self.toolbar, text="Y", command=lambda: self.set_view('y'), **btn_style).pack(side=tk.LEFT, padx=1)
-        tk.Button(self.toolbar, text="Z", command=lambda: self.set_view('z'), **btn_style).pack(side=tk.LEFT, padx=1)
+        self.view_buttons = {}
+        for axis in ['x', 'y', 'z']:
+            btn = tk.Button(self.toolbar, text=axis.upper(), 
+                          command=lambda a=axis: self.set_view(a), **btn_style)
+            btn.pack(side=tk.LEFT, padx=1)
+            self.view_buttons[axis] = btn
+            
         tk.Button(self.toolbar, text="Iso", command=self.reset_view, **btn_style).pack(side=tk.LEFT, padx=1)
+        
+        # Sketch plane indicator
+        self.plane_label = tk.Label(self.toolbar, text=f"Plane: {self.sketch_plane}", 
+                                   bg='#2d2d2d', fg='#aaaaaa', font=('Arial', 8))
+        self.plane_label.pack(side=tk.RIGHT, padx=10)
         
         # Main canvas
         self.frame = tk.Frame(self.parent_frame, bg=self.colors['bg'])
@@ -80,7 +114,7 @@ class EmbeddedPyVistaViewer:
         
         # Info label at bottom
         self.info_label = tk.Label(self.frame, 
-                                  text="Left: Rotate | Right: Pan | Scroll: Zoom | Click: Select", 
+                                  text=f"Left: Rotate | Right: Pan | Scroll: Zoom | Click: Select | Plane: {self.sketch_plane}", 
                                   bg='#2d2d2d', fg=self.colors['text'], font=('Arial', 8))
         self.info_label.pack(fill=tk.X, side=tk.BOTTOM)
         
@@ -95,21 +129,49 @@ class EmbeddedPyVistaViewer:
         self.canvas.bind("<Button-5>", self._on_scroll)
         self.canvas.bind("<Configure>", lambda e: self.draw())
         
-    def _transform_coordinate(self, layer_name, point_2d, layer_z):
+    def _transform_coordinate(self, layer_name, point_2d, layer_value):
         """
         Transform from JSON coordinate system to display coordinate system.
         
-        JSON Input: point_2d = (x, z), layer_z = y (height)
-        Display: (x, y, z) where y is up
-        """
-        x, z = point_2d  # JSON has X and Z as the plane
-        y = layer_z      # Layer value is actually Y (height) in standard CFD coords
+        Based on sketch_plane setting:
+        - XY plane: point_2d = (x, y), layer_value = z -> 3D is (x, y, z)
+        - XZ plane: point_2d = (x, z), layer_value = y -> 3D is (x, y, z) [Y/Z swapped]
+        - YZ plane: point_2d = (y, z), layer_value = x -> 3D is (x, y, z) [X/Y/Z cycled]
         
-        # Return as (X, Y, Z) for standard right-handed coordinate system
+        Display coordinate system: X (right), Y (up/forward), Z (up/height)
+        """
+        x_2d, y_2d = point_2d
+        
+        if self.sketch_plane == "XY":
+            # XY plane: points are (x, y), layer is z
+            x = x_2d
+            y = y_2d
+            z = layer_value
+        elif self.sketch_plane == "XZ":
+            # XZ plane: points are (x, z), layer is y
+            x = x_2d
+            y = layer_value
+            z = y_2d
+        elif self.sketch_plane == "YZ":
+            # YZ plane: points are (y, z), layer is x
+            x = layer_value
+            y = x_2d
+            z = y_2d
+        else:
+            # Default to XY
+            x = x_2d
+            y = y_2d
+            z = layer_value
+        
         return np.array([x, y, z])
         
     def _rebuild_coord_cache(self):
         """Cache all global point coordinates with proper transform"""
+        # Update sketch plane in case it changed
+        self.sketch_plane = getattr(self.mesh_data, 'sketch_plane', 'XY')
+        self.plane_label.config(text=f"Plane: {self.sketch_plane}")
+        self.info_label.config(text=f"Left: Rotate | Right: Pan | Scroll: Zoom | Click: Select | Plane: {self.sketch_plane}")
+        
         coords = []
         self._global_to_local = {}
         
@@ -118,11 +180,15 @@ class EmbeddedPyVistaViewer:
                            key=lambda x: self.mesh_data.layers[x])
         
         for layer_name in layer_list:
+            # LAYER FILTERING: Skip layers not in visible_layers (if visible_layers is set)
+            # If visible_layers is empty, show all layers
+            if self.visible_layers and layer_name not in self.visible_layers:
+                continue
+                
             if layer_name in self.mesh_data.points:
-                layer_y = self.mesh_data.layers[layer_name]  # This is the Y coordinate
+                layer_value = self.mesh_data.layers[layer_name]
                 for local_idx, pt_2d in enumerate(self.mesh_data.points[layer_name]):
-                    # pt_2d is (x, z) from JSON
-                    coord_3d = self._transform_coordinate(layer_name, pt_2d, layer_y)
+                    coord_3d = self._transform_coordinate(layer_name, pt_2d, layer_value)
                     coords.append(coord_3d)
                     self._global_to_local[idx] = (layer_name, local_idx)
                     idx += 1
@@ -131,15 +197,15 @@ class EmbeddedPyVistaViewer:
         self._total_points = idx
         
     def _rotate_point(self, point):
-        """Apply rotation to a 3D point"""
+        """Apply rotation to a 3D point - Z is UP"""
         x, y, z = point
             
-        # Rotate around X axis (rotates Y towards Z)
+        # Rotate around X axis (rotates Z towards Y)
         rad_x = math.radians(self.rotation_x)
         cos_x, sin_x = math.cos(rad_x), math.sin(rad_x)
         y, z = y * cos_x - z * sin_x, y * sin_x + z * cos_x
             
-        # Rotate around Y axis (rotates Z towards X)
+        # Rotate around Y axis (rotates X towards Z)
         rad_y = math.radians(self.rotation_y)
         cos_y, sin_y = math.cos(rad_y), math.sin(rad_y)
         z, x = z * cos_y - x * sin_y, z * sin_y + x * cos_y
@@ -164,12 +230,15 @@ class EmbeddedPyVistaViewer:
         self.canvas.delete("all")
         
         if len(self._global_coords) == 0:
-            self._draw_axes_widget()  # Still draw axes even if no points
+            self._draw_axes_widget()
             return
             
         # Brighter colors for dark mode
         color_map = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2']
-        layer_list = sorted(self.mesh_data.layers.keys(), 
+        
+        # LAYER FILTERING: Only include visible layers in layer list
+        layer_list = sorted([ln for ln in self.mesh_data.layers.keys() 
+                            if not self.visible_layers or ln in self.visible_layers], 
                            key=lambda x: self.mesh_data.layers[x])
         layer_to_idx = {name: i for i, name in enumerate(layer_list)}
         
@@ -187,12 +256,12 @@ class EmbeddedPyVistaViewer:
         # Sort by Z depth (painter's algorithm)
         projected_points.sort(key=lambda x: x[3], reverse=True)
         
-        points_by_layer = {i: [] for i in range(len(self.mesh_data.layers))}
+        points_by_layer = {i: [] for i in range(len(layer_list))}
         selected_points_list = []
         
         for global_idx, screen_x, screen_y, z_depth, coord in projected_points:
             layer_name, _ = self._global_to_local[global_idx]
-            layer_idx = layer_to_idx[layer_name]
+            layer_idx = layer_to_idx.get(layer_name, 0)
             
             if global_idx in self.selected_points:
                 selected_points_list.append((global_idx, screen_x, screen_y, coord))
@@ -215,7 +284,7 @@ class EmbeddedPyVistaViewer:
                 self.canvas.create_oval(x-r, y-r, x+r, y+r, 
                                        fill=color, outline='white', width=1,
                                        tags=f"point_{global_idx}")
-                # Show coordinates in X,Y,Z format
+                # Show coordinates
                 label = f"{global_idx}:({coord[0]:.1f},{coord[1]:.1f},{coord[2]:.1f})"
                 self.canvas.create_text(x, y-10, text=str(global_idx), 
                                        fill=color, font=('Courier', 9, 'bold'),
@@ -257,8 +326,14 @@ class EmbeddedPyVistaViewer:
                 
                 self.canvas.create_line(x1, y1, x2, y2, fill=color, width=2)
         
-        # Inter-layer connections (these are vertical connections in Y direction)
+        # Inter-layer connections (vertical connections)
+        # LAYER FILTERING: Only draw inter-layer connections if both layers are visible
         for layer1, idx1, layer2, idx2 in getattr(self.mesh_data, 'inter_layer_connections', []):
+            # Skip if layer filtering is active and either layer is not visible
+            if self.visible_layers:
+                if layer1 not in self.visible_layers or layer2 not in self.visible_layers:
+                    continue
+                    
             g1 = self._local_to_global(layer1, idx1)
             g2 = self._local_to_global(layer2, idx2)
             
@@ -269,14 +344,16 @@ class EmbeddedPyVistaViewer:
             x1, y1 = self._screen_coords[g1]
             x2, y2 = self._screen_coords[g2]
             
-            # Inter-layer connections are vertical (Y-direction), draw them differently
             self.canvas.create_line(x1, y1, x2, y2, fill='#888888', width=1, dash=(4, 2))
     
     def _draw_hex_blocks(self):
         """Draw hex block wireframes"""
         for block in getattr(self.parent_tab, 'hex_blocks', []):
-            verts = block['vertices']  # These are already in (X,Y,Z) format from create_hex_block
+            verts = block.get('vertices', [])
             
+            if len(verts) != 8:
+                continue
+                
             screen_verts = []
             valid = True
             for v in verts:
@@ -290,45 +367,46 @@ class EmbeddedPyVistaViewer:
             if not valid or len(screen_verts) != 8:
                 continue
             
-            edges = [(0,1),(1,2),(2,3),(3,0),
-                    (4,5),(5,6),(6,7),(7,4),
-                    (0,4),(1,5),(2,6),(3,7)]
+            edges = [
+                (0,1), (1,2), (2,3), (3,0),
+                (4,5), (5,6), (6,7), (7,4),
+                (0,4), (1,5), (2,6), (3,7)
+            ]
             
             for i, j in edges:
                 x1, y1, z1 = screen_verts[i]
                 x2, y2, z2 = screen_verts[j]
                 avg_z = (z1 + z2) / 2
                 width = 3 if avg_z > 0 else 2
-                self.canvas.create_line(x1, y1, x2, y2, fill='#66ff66', width=width)
+                color = '#66ff66' if avg_z > 0 else '#44aa44'
+                self.canvas.create_line(x1, y1, x2, y2, fill=color, width=width)
             
-            # Translucent faces
             faces = [(0,1,2,3), (4,5,6,7), (0,1,5,4), (2,3,7,6), (1,2,6,5), (0,3,7,4)]
             for face in faces:
                 points = [(screen_verts[i][0], screen_verts[i][1]) for i in face]
+                avg_z_face = sum(screen_verts[i][2] for i in face) / 4
+                alpha = 'gray75' if avg_z_face > 0 else 'gray25'
                 self.canvas.create_polygon(points, fill='#66ff66', 
-                                          stipple='gray50', outline='#44ff44', width=1)
+                                          stipple=alpha, outline='#44ff44', width=1)
     
     def _draw_axes_widget(self):
         """Draw rotating axes indicator in bottom right corner"""
         w = self.canvas.winfo_width()
         h = self.canvas.winfo_height()
         
-        # Position in bottom right with padding
         center_x = w - 50
         center_y = h - 50
         length = 30
         
-        # Get rotated basis vectors
         x_vec = self._rotate_point([length, 0, 0])
         y_vec = self._rotate_point([0, length, 0])
         z_vec = self._rotate_point([0, 0, length])
         
-        # Draw axis lines (2D projection: we use x and y of rotated vector)
         # X axis - Red
         self.canvas.create_line(center_x, center_y, 
                                center_x + x_vec[0], center_y - x_vec[1],
                                fill=self.colors['x_axis'], width=3, arrow=tk.LAST)
-        # Y axis - Green (UP in CFD standard)
+        # Y axis - Green
         self.canvas.create_line(center_x, center_y, 
                                center_x + y_vec[0], center_y - y_vec[1],
                                fill=self.colors['y_axis'], width=3, arrow=tk.LAST)
@@ -337,8 +415,7 @@ class EmbeddedPyVistaViewer:
                                center_x + z_vec[0], center_y - z_vec[1],
                                fill=self.colors['z_axis'], width=3, arrow=tk.LAST)
         
-        # Labels
-        label_offset = 5
+        label_offset = 8
         self.canvas.create_text(center_x + x_vec[0] + label_offset, 
                                center_y - x_vec[1] - label_offset,
                                text="X", fill=self.colors['x_axis'], 
@@ -352,14 +429,21 @@ class EmbeddedPyVistaViewer:
                                text="Z", fill=self.colors['z_axis'], 
                                font=('Arial', 10, 'bold'))
         
-        # Draw background circle for contrast
         self.canvas.create_oval(center_x-35, center_y-35, center_x+35, center_y+35,
                                outline='#444444', width=1, stipple='gray50')
     
     def _local_to_global(self, layer_name, local_idx):
-        """Convert local index to global index"""
-        layer_list = sorted(self.mesh_data.layers.keys(), 
-                           key=lambda x: self.mesh_data.layers[x])
+        """Convert local index to global index - ACCOUNTING FOR LAYER FILTERING"""
+        # LAYER FILTERING: If filtering is active, we need to recalculate indices
+        if self.visible_layers:
+            # Only count layers that are visible
+            layer_list = sorted([ln for ln in self.mesh_data.layers.keys() 
+                                if ln in self.visible_layers], 
+                               key=lambda x: self.mesh_data.layers[x])
+        else:
+            layer_list = sorted(self.mesh_data.layers.keys(), 
+                               key=lambda x: self.mesh_data.layers[x])
+        
         offset = 0
         for name in layer_list:
             if name == layer_name:
@@ -406,6 +490,8 @@ class EmbeddedPyVistaViewer:
             self._drag_data["x"] = event.x
             self._drag_data["y"] = event.y
             
+            self._current_view = None
+            self._update_view_button_labels()
             self.draw()
         elif self._drag_data["action"] == "pan":
             dx = event.x - self._drag_data["x"]
@@ -453,18 +539,14 @@ class EmbeddedPyVistaViewer:
         if len(self._global_coords) == 0:
             return
         
-        # Get bounding box of all points
         coords = self._global_coords
         min_coords = coords.min(axis=0)
         max_coords = coords.max(axis=0)
         center = (min_coords + max_coords) / 2
         
-        # Reset pan to center the object
         self.pan_x = 0
         self.pan_y = 0
         
-        # Project bounds to screen to calculate required zoom
-        # First try with current zoom=1 to get size in pixels
         temp_zoom = self.zoom
         self.zoom = 1.0
         
@@ -487,23 +569,56 @@ class EmbeddedPyVistaViewer:
         
         canvas_size = min(self.canvas.winfo_width(), self.canvas.winfo_height())
         if screen_range > 0:
-            self.zoom = (canvas_size / screen_range) * 0.8  # 80% fit with margin
+            self.zoom = (canvas_size / screen_range) * 0.8
         
         self.zoom = max(0.1, min(10.0, self.zoom))
         self.draw()
     
     def set_view(self, axis):
-        """Set view perpendicular to specified axis"""
+        """
+        Set view perpendicular to specified axis with toggle functionality.
+        """
+        if self._current_view == axis:
+            self._view_positive = not self._view_positive
+        else:
+            self._current_view = axis
+            self._view_positive = True
+        
         if axis == 'x':
-            self.rotation_x = 0
-            self.rotation_y = 90  # Look from +X, see YZ plane
+            if self._view_positive:
+                self.rotation_x = 0
+                self.rotation_y = -90
+            else:
+                self.rotation_x = 0
+                self.rotation_y = 90
+                
         elif axis == 'y':
-            self.rotation_x = 0   # Look from +Y down (top view in CFD)
-            self.rotation_y = 0
+            if self._view_positive:
+                self.rotation_x = 0
+                self.rotation_y = 0
+            else:
+                self.rotation_x = 0
+                self.rotation_y = 180
+                
         elif axis == 'z':
-            self.rotation_x = 90  # Look from +Z, see XY plane
-            self.rotation_y = 0
+            if self._view_positive:
+                self.rotation_x = -90
+                self.rotation_y = 0
+            else:
+                self.rotation_x = 90
+                self.rotation_y = 0
+        
+        self._update_view_button_labels()
         self.draw()
+    
+    def _update_view_button_labels(self):
+        """Update view button labels to show + or - direction"""
+        for axis, btn in self.view_buttons.items():
+            if self._current_view == axis:
+                sign = '+' if self._view_positive else '-'
+                btn.config(text=f"{sign}{axis.upper()}", bg='#606060')
+            else:
+                btn.config(text=axis.upper(), bg='#404040')
     
     def hide_selected(self):
         """Hide currently selected points"""
@@ -532,6 +647,16 @@ class EmbeddedPyVistaViewer:
         """Set selection from outside"""
         self.selected_points = set(global_indices)
         self.draw()
+    
+    # LAYER FILTERING: New method to set visible layers
+    def set_visible_layers(self, layer_names):
+        """Set which layers should be visible. Empty set means show all."""
+        self.visible_layers = set(layer_names)
+        self._rebuild_coord_cache()
+        # Clear selection if selected points are in hidden layers
+        self.selected_points = {idx for idx in self.selected_points 
+                               if idx < self._total_points}
+        self.draw()
         
     def reset_view(self):
         """Reset camera to isometric view"""
@@ -540,6 +665,9 @@ class EmbeddedPyVistaViewer:
         self.zoom = 1.0
         self.pan_x = 0
         self.pan_y = 0
+        self._current_view = 'iso'
+        self._view_positive = True
+        self._update_view_button_labels()
         self.draw()
         
     def refresh(self):

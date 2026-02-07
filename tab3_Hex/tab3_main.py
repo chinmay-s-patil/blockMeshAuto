@@ -18,7 +18,7 @@ class TabHexBlockMaking:
         self.mesh_data = mesh_data
         
         # Block management - use mesh_data.hex_blocks for persistence
-        self.selected_points = []  # List of global indices
+        self.selected_points = []  # List of global indices - PRESERVES ORDER
         self.current_block_idx = None
         self.editing_block_idx = None  # Track which block is being edited
         
@@ -386,22 +386,24 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         if self.viewer:
             self.viewer.refresh()
     
-    def on_selection_changed(self, selected_set):
-        """Called by viewer when points are clicked"""
-        # Preserve selection order - do NOT sort!
-        self.selected_points = list(selected_set)
+    def on_selection_changed(self, selected_list):
+        """Called by viewer when points are clicked - PRESERVES ORDER"""
+        # PRESERVE ORDER: Direct assignment, do NOT sort
+        self.selected_points = list(selected_list)
         self.update_point_list()
         self.point_status.config(text=f"Selected: {len(self.selected_points)}/8 points")
     
     def update_point_list(self):
-        """Update the points listbox"""
+        """Update the points listbox - PRESERVES ORDER"""
         self.point_list.delete(0, tk.END)
-        for global_idx in self.selected_points:
+        # PRESERVE ORDER: Iterate in selection order
+        for i, global_idx in enumerate(self.selected_points):
             layer, local_idx = self.mesh_data.get_layer_from_global_index(global_idx)
             point_2d = self.mesh_data.points[layer][local_idx]
             coords_3d = self.mesh_data.get_3d_coords(layer, point_2d)
+            # Show selection index (order) and global index
             self.point_list.insert(tk.END,
-                f"Point {global_idx}: {layer}[{local_idx}] "
+                f"[{i}] Point {global_idx}: {layer}[{local_idx}] "
                 f"({coords_3d[0]:.2f},{coords_3d[1]:.2f},{coords_3d[2]:.2f})")
     
     def hide_selected(self):
@@ -440,12 +442,12 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         return (x, y, z)
     
     def create_hex_block(self):
-        """Create a hexahedral block from selected points"""
+        """Create a hexahedral block from selected points - PRESERVES ORDER"""
         if len(self.selected_points) != 8:
             messagebox.showwarning("Warning", f"Need exactly 8 points, have {len(self.selected_points)}")
             return
         
-        # Trust the user's selection order exactly as OpenFOAM expects:
+        # PRESERVE ORDER: Trust the user's selection order exactly as OpenFOAM expects:
         # User selects: 0, 1, 2, 3 on bottom (CCW from below)
         # Then: 4, 5, 6, 7 on top (CCW from above)
         # Vertical edges are: 0-4, 1-5, 2-6, 3-7
@@ -453,6 +455,7 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         vertices = []
         layers_used = set()
         
+        # PRESERVE ORDER: Iterate in selection order
         for global_idx in self.selected_points:
             layer, local_idx = self.mesh_data.get_layer_from_global_index(global_idx)
             layers_used.add(layer)
@@ -469,7 +472,7 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         
         if max(z_bottom) > min(z_top):
             messagebox.showerror("Error", 
-                "First 4 points must be on the bottom layer (lower Z),\\n"
+                "First 4 points must be on the bottom layer (lower Z),\n"
                 "and last 4 points must be on the top layer (higher Z)")
             return
         
@@ -489,9 +492,10 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
             elif self.single_div_dir.get() == "Z":
                 nz = 1
         
+        # PRESERVE ORDER: Store vertices and point_refs in selection order
         block = {
             'vertices': vertices,  # In OpenFOAM order: 0-1-2-3 bottom, 4-5-6-7 top
-            'point_refs': self.selected_points.copy(),  # Store the global indices used
+            'point_refs': list(self.selected_points),  # PRESERVE ORDER: Store ordered list
             'divisions': (nx, ny, nz),
             'grading_type': self.grading_type.get(),
             'grading_params': {'x': self.grading_x.get(),
@@ -505,9 +509,9 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         self.clear_point_selection()
         if self.viewer:
             self.viewer.draw()
-        messagebox.showinfo("Success", f"Hex Block created!\\n\\n"
-                           f"Vertex order: 0-1-2-3 (bottom), 4-5-6-7 (top)\\n"
-                           f"Divisions: {nx}×{ny}×{nz}\\n"
+        messagebox.showinfo("Success", f"Hex Block created!\n\n"
+                           f"Vertex order: 0-1-2-3 (bottom), 4-5-6-7 (top)\n"
+                           f"Divisions: {nx}×{ny}×{nz}\n"
                            f"Grading: ({self.grading_x.get()}, {self.grading_y.get()}, {self.grading_z.get()})")
     
     def _calculate_divisions(self, vertices, cell_size):
@@ -544,12 +548,13 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
             # Show block info
             block = self.mesh_data.hex_blocks[self.current_block_idx]
             verts = block['vertices']
-            info = f"Vertices: {len(verts)}\\nDivisions: {block['divisions']}\\nGrading: {block['grading_params']}"
+            info = f"Vertices: {len(verts)}\nDivisions: {block['divisions']}\nGrading: {block['grading_params']}"
             self.block_info.config(text=info)
             
             # Highlight the selected block's points in the viewer
+            # PRESERVE ORDER: Pass point_refs as list to preserve order
             if self.viewer and block.get('point_refs'):
-                self.viewer.set_selection(set(block['point_refs']))
+                self.viewer.set_selection(list(block['point_refs']))
     
     def edit_block(self):
         """Open edit dialog for selected block"""
@@ -641,8 +646,9 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         
         def highlight_vertices():
             """Highlight the vertices of this block in the 3D view"""
+            # PRESERVE ORDER: Pass point_refs as list
             if self.viewer and block.get('point_refs'):
-                self.viewer.set_selection(set(block['point_refs']))
+                self.viewer.set_selection(list(block['point_refs']))
                 # Switch to points tab to see selection
                 self.notebook.select(self.tab_points)
         
@@ -660,7 +666,7 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         verts = block['vertices']
         info_text = ""
         for i, v in enumerate(verts):
-            info_text += f"{i}: ({v[0]:.2f}, {v[1]:.2f}, {v[2]:.2f})\\n"
+            info_text += f"{i}: ({v[0]:.2f}, {v[1]:.2f}, {v[2]:.2f})\n"
         tk.Label(info_frame, text=info_text, font=("Courier", 8), justify=tk.LEFT).pack(anchor=tk.W)
     
     def delete_block(self):

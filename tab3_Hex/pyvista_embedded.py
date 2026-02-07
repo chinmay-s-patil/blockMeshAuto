@@ -23,7 +23,8 @@ class EmbeddedPyVistaViewer:
         # Get sketch plane from mesh data
         self.sketch_plane = getattr(mesh_data, 'sketch_plane', 'XY')
         
-        self.selected_points = set()  # Global indices
+        # PRESERVE ORDER: Use list instead of set to maintain selection order
+        self.selected_points = []  # Global indices in order selected
         self.hidden_points = set()
         
         # LAYER FILTERING: Track which layers are visible
@@ -240,6 +241,7 @@ class EmbeddedPyVistaViewer:
             layer_name, _ = self._global_to_local[global_idx]
             layer_idx = layer_to_idx.get(layer_name, 0)
             
+            # PRESERVE ORDER: Check if in selected_points list
             if global_idx in self.selected_points:
                 selected_points_list.append((global_idx, screen_x, screen_y, coord))
             else:
@@ -267,7 +269,11 @@ class EmbeddedPyVistaViewer:
                                        fill=color, font=('Courier', 9, 'bold'),
                                        tags=f"label_{global_idx}")
         
-        # Draw selected points (on top, larger)
+        # Draw selected points (on top, larger) - PRESERVE ORDER: Draw in selection order
+        # Re-sort selected_points_list to match self.selected_points order
+        order_map = {idx: i for i, idx in enumerate(self.selected_points)}
+        selected_points_list.sort(key=lambda x: order_map.get(x[0], 999))
+        
         for global_idx, x, y, coord in selected_points_list:
             r = 10
             self.canvas.create_oval(x-r, y-r, x+r, y+r, 
@@ -429,7 +435,7 @@ class EmbeddedPyVistaViewer:
         return -1
     
     def _on_left_click(self, event):
-        """Handle point picking"""
+        """Handle point picking - PRESERVES ORDER"""
         clicked_point = None
         min_dist = float('inf')
         
@@ -445,11 +451,12 @@ class EmbeddedPyVistaViewer:
                 self.selected_points.remove(clicked_point)
             else:
                 if len(self.selected_points) < 8:
-                    self.selected_points.append(clicked_point)  # Use append instead of add
+                    self.selected_points.append(clicked_point)  # APPEND to preserve order
                 else:
                     messagebox.showwarning("Limit", "Maximum 8 points allowed")
                     return
             
+            # Pass list to preserve order
             self.parent_tab.on_selection_changed(self.selected_points.copy())
             self.draw()
         else:
@@ -599,14 +606,20 @@ class EmbeddedPyVistaViewer:
     
     def hide_selected(self):
         """Hide currently selected points"""
-        self.hidden_points.update(self.selected_points)  # this works, set.update() accepts any iterable
+        self.hidden_points.update(self.selected_points)
         self.selected_points = []
         self.draw()
         self.parent_tab.update_point_list()
         
     def set_selection(self, global_indices):
-        """Set selection from outside"""
-        self.selected_points = list(global_indices)  # Was: set(global_indices)
+        """Set selection from outside - PRESERVES ORDER of input"""
+        # Ensure it's a list to preserve order
+        if isinstance(global_indices, set):
+            # If somehow a set is passed, we can't preserve order, but convert to list
+            self.selected_points = list(global_indices)
+        else:
+            # It's already a list or other ordered sequence
+            self.selected_points = list(global_indices)
         self.draw()
         
     def show_all(self):
@@ -620,8 +633,8 @@ class EmbeddedPyVistaViewer:
         self.draw()
         
     def set_selection(self, global_indices):
-        """Set selection from outside"""
-        self.selected_points = list(global_indices)  # convert to list
+        """Set selection from outside - PRESERVES ORDER"""
+        self.selected_points = list(global_indices)
         self.draw()
     
     # LAYER FILTERING: New method to set visible layers
@@ -630,8 +643,8 @@ class EmbeddedPyVistaViewer:
         self.visible_layers = set(layer_names)
         self._rebuild_coord_cache()
         # Clear selection if selected points are in hidden layers
-        self.selected_points = {idx for idx in self.selected_points 
-                               if idx < self._total_points}
+        self.selected_points = [idx for idx in self.selected_points 
+                               if idx < self._total_points]
         self.draw()
         
     def reset_view(self):

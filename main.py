@@ -1,13 +1,11 @@
 """
 OpenFOAM blockMesh Builder - Main Application
-Modularized version with separated tab components
+Dark Mode Edition with Edge Editor Tab
 """
 
 import os
-os.environ['PYVISTA_TRAME'] = 'false'  # Different variable name
+os.environ['PYVISTA_TRAME'] = 'false'
 os.environ['PYVISTA_TRAME_SERVER'] = 'false'
-
-
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -17,16 +15,34 @@ import os
 from mesh_data import MeshData
 from tab1_projectSettings.tab1_main import TabProjectSettings
 from tab2_2DEditor.tab2_main import Tab2DEditor
-from tab3_Hex.tab3_main import TabHexBlockMaking
-from tab4_3d_patches import Tab3DPatches
-from tab5_export import TabExport
+from tab3_Edges.TabEdgeEditor import TabEdgeEditor
+from tab4_Hex.tab4_main import TabHexBlockMaking
+from tab5_3DPatches.tab5_main import Tab3DPatches
+from tab6_export.tab6_main import TabExport
 
 
 class MeshBuilderApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("OpenFOAM blockMesh Builder")
+        self.root.title("OpenFOAM blockMesh Builder - Dark Mode")
         self.root.geometry("1400x900")
+        
+        # Dark mode colors
+        self.colors = {
+            'bg': '#1e1e1e',
+            'fg': '#d4d4d4',
+            'accent': '#007acc',
+            'success': '#4ec9b0',
+            'warning': '#ce9178',
+            'error': '#f44747',
+            'secondary': '#252526',
+            'border': '#3e3e42',
+            'button_bg': '#0e639c',
+            'button_fg': '#ffffff',
+            'tab_bg': '#2d2d2d',
+            'tab_fg': '#ffffff',
+            'tab_selected': '#007acc'
+        }
         
         self.mesh_data = MeshData()
         
@@ -34,30 +50,74 @@ class MeshBuilderApp:
         if not os.path.exists("temp"):
             os.makedirs("temp")
         
+        self.setup_dark_mode()
         self.setup_top_bar()
         self.setup_notebook()
         self.setup_tabs()
         
         self.auto_save()
         
+    def setup_dark_mode(self):
+        """Configure dark mode styles"""
+        self.root.configure(bg=self.colors['bg'])
+        
+        # Configure ttk styles for dark mode
+        style = ttk.Style()
+        style.theme_use('default')
+        
+        # Notebook styling
+        style.configure('TNotebook', background=self.colors['secondary'], tabmargins=[2, 5, 2, 0])
+        style.configure('TNotebook.Tab', 
+                       background=self.colors['tab_bg'],
+                       foreground=self.colors['tab_fg'],
+                       padding=[10, 5],
+                       font=('Arial', 10, 'bold'))
+        style.map('TNotebook.Tab',
+                 background=[('selected', self.colors['tab_selected']),
+                           ('active', self.colors['accent'])],
+                 foreground=[('selected', self.colors['tab_fg'])])
+        
+        # Frame styling
+        style.configure('TFrame', background=self.colors['bg'])
+        style.configure('TLabelframe', background=self.colors['secondary'], 
+                       foreground=self.colors['fg'])
+        style.configure('TLabelframe.Label', 
+                       background=self.colors['secondary'],
+                       foreground=self.colors['fg'],
+                       font=('Arial', 10, 'bold'))
+        
+        # Other widget styles
+        style.configure('TLabel', background=self.colors['bg'], foreground=self.colors['fg'])
+        style.configure('TButton', 
+                       background=self.colors['button_bg'],
+                       foreground=self.colors['button_fg'])
+        
     def setup_top_bar(self):
-        """Create top bar with save/load/new buttons"""
-        top_frame = tk.Frame(self.root, bg="lightgray", height=50)
+        """Create top bar with dark mode styling"""
+        top_frame = tk.Frame(self.root, bg=self.colors['secondary'], height=50)
         top_frame.pack(side=tk.TOP, fill=tk.X)
         top_frame.pack_propagate(False)
         
         tk.Label(top_frame, text="OpenFOAM Mesh Builder", 
-                font=("Arial", 14, "bold"), bg="lightgray").pack(side=tk.LEFT, padx=10)
+                font=("Arial", 14, "bold"), 
+                bg=self.colors['secondary'], 
+                fg=self.colors['fg']).pack(side=tk.LEFT, padx=10)
         
-        button_frame = tk.Frame(top_frame, bg="lightgray")
+        button_frame = tk.Frame(top_frame, bg=self.colors['secondary'])
         button_frame.pack(side=tk.RIGHT, padx=10)
         
-        tk.Button(button_frame, text="💾 Save", command=self.save_to_json,
-                 bg="lightgreen", font=("Arial", 10, "bold"), width=8).pack(side=tk.LEFT, padx=2)
-        tk.Button(button_frame, text="📂 Load", command=self.load_from_json,
-                 bg="lightblue", font=("Arial", 10, "bold"), width=8).pack(side=tk.LEFT, padx=2)
-        tk.Button(button_frame, text="🔄 New", command=self.new_project,
-                 bg="lightyellow", font=("Arial", 10, "bold"), width=8).pack(side=tk.LEFT, padx=2)
+        btn_style = {
+            'bg': self.colors['button_bg'],
+            'fg': self.colors['button_fg'],
+            'font': ('Arial', 10, 'bold'),
+            'width': 8,
+            'relief': tk.FLAT,
+            'cursor': 'hand2'
+        }
+        
+        tk.Button(button_frame, text="💾 Save", command=self.save_to_json, **btn_style).pack(side=tk.LEFT, padx=2)
+        tk.Button(button_frame, text="📂 Load", command=self.load_from_json, **btn_style).pack(side=tk.LEFT, padx=2)
+        tk.Button(button_frame, text="🔄 New", command=self.new_project, **btn_style).pack(side=tk.LEFT, padx=2)
         
     def setup_notebook(self):
         """Create the tabbed notebook interface"""
@@ -65,23 +125,26 @@ class MeshBuilderApp:
         self.notebook.pack(fill=tk.BOTH, expand=True)
         
         # Create tab frames
-        self.tab_project = tk.Frame(self.notebook)
-        self.tab_2d = tk.Frame(self.notebook)
-        self.tab_grid = tk.Frame(self.notebook)
-        self.tab_3d = tk.Frame(self.notebook)
-        self.tab_export = tk.Frame(self.notebook)
+        self.tab_project = tk.Frame(self.notebook, bg=self.colors['bg'])
+        self.tab_2d = tk.Frame(self.notebook, bg=self.colors['bg'])
+        self.tab_edges = tk.Frame(self.notebook, bg=self.colors['bg'])  # NEW: Edge Editor
+        self.tab_grid = tk.Frame(self.notebook, bg=self.colors['bg'])
+        self.tab_3d = tk.Frame(self.notebook, bg=self.colors['bg'])
+        self.tab_export = tk.Frame(self.notebook, bg=self.colors['bg'])
         
         # Add tabs to notebook
         self.notebook.add(self.tab_project, text="1. Project Settings")
         self.notebook.add(self.tab_2d, text="2. Points & Connections")
-        self.notebook.add(self.tab_grid, text="3. Grid Sizing")
-        self.notebook.add(self.tab_3d, text="4. 3D View & Patches")
-        self.notebook.add(self.tab_export, text="5. Export blockMeshDict")
+        self.notebook.add(self.tab_edges, text="3. Edge Editor")      # NEW TAB
+        self.notebook.add(self.tab_grid, text="4. Hex Blocks")
+        self.notebook.add(self.tab_3d, text="5. 3D View & Patches")
+        self.notebook.add(self.tab_export, text="6. Export blockMeshDict")
         
     def setup_tabs(self):
         """Initialize all tab components"""
         self.project_settings = TabProjectSettings(self.tab_project, self.mesh_data)
         self.editor_2d = Tab2DEditor(self.tab_2d, self.mesh_data)
+        self.edge_editor = TabEdgeEditor(self.tab_edges, self.mesh_data)  # NEW
         self.hex_blocks = TabHexBlockMaking(self.tab_grid, self.mesh_data)
         self.patches_3d = Tab3DPatches(self.tab_3d, self.mesh_data)
         self.export_tab = TabExport(self.tab_export, self.mesh_data)
@@ -98,8 +161,8 @@ class MeshBuilderApp:
     
     def save_to_json(self):
         """Save project to JSON file"""
-        # Save any pending settings from Tab 1
-        self.project_settings.save_all_settings()
+        if hasattr(self.project_settings, 'save_all_settings'):
+            self.project_settings.save_all_settings()
         
         default_filename = self.get_default_save_filename()
         
@@ -133,8 +196,15 @@ class MeshBuilderApp:
                 # Update all tab views
                 self.project_settings.update_display()
                 self.editor_2d.update_layer_list()
-                self.editor_2d.update_iso_checkboxes()
+                self.editor_2d.update_dual_view_buttons()
                 self.editor_2d.update_plot()
+                
+                # Update edge editor
+                self.edge_editor._update_edge_list()
+                self.edge_editor.viewer.refresh()
+                
+                self.hex_blocks.refresh_layers()
+                self.hex_blocks.update_block_list()
                 self.patches_3d.update_view()
                 self.export_tab.update_summary()
                 
@@ -145,7 +215,6 @@ class MeshBuilderApp:
     def auto_save(self):
         """Auto-save project every 30 seconds to temp folder"""
         try:
-            # Save any pending settings from Tab 1
             if hasattr(self.project_settings, 'save_all_settings'):
                 self.project_settings.save_all_settings()
             
@@ -161,7 +230,7 @@ class MeshBuilderApp:
     def new_project(self):
         """Start a new project"""
         result = messagebox.askyesnocancel("New Project", 
-                                          "Do you want to save the current project before starting a new one?")
+                                          "Save current project before starting new?")
         if result is None:
             return
         elif result:
@@ -170,26 +239,36 @@ class MeshBuilderApp:
         # Reset mesh data
         self.mesh_data = MeshData()
         
-        # Reset all tab components with new mesh data
+        # Reset all tab components
         self.project_settings.mesh_data = self.mesh_data
         self.editor_2d.mesh_data = self.mesh_data
+        self.edge_editor.mesh_data = self.mesh_data
+        self.edge_editor.viewer.mesh_data = self.mesh_data
         self.hex_blocks.mesh_data = self.mesh_data
         self.patches_3d.mesh_data = self.mesh_data
-        self.patches_3d.viewer_3d.mesh_data = self.mesh_data
+        if hasattr(self.patches_3d, 'viewer_3d'):
+            self.patches_3d.viewer_3d.mesh_data = self.mesh_data
         self.export_tab.mesh_data = self.mesh_data
         
         # Update all views
         self.project_settings.update_display()
         self.editor_2d.selected_points = []
-        self.editor_2d.iso_layers = []
-        self.editor_2d.iso_mode = False
-        self.editor_2d.iso_mode_var.set(False)
+        self.editor_2d.dual_view_layers = []
+        self.editor_2d.dual_view_var.set(False)
         
         self.editor_2d.update_layer_list()
-        self.editor_2d.update_iso_checkboxes()
+        self.editor_2d.update_dual_view_buttons()
         self.editor_2d.update_plot()
+        
+        # Reset edge editor
+        self.edge_editor._reset_creation()
+        self.edge_editor._update_edge_list()
+        
+        self.hex_blocks.refresh_layers()
+        self.hex_blocks.update_block_list()
         self.patches_3d.update_view()
-        self.patches_3d.clear_face_selection()
+        if hasattr(self.patches_3d, 'clear_face_selection'):
+            self.patches_3d.clear_face_selection()
         self.export_tab.update_summary()
         
         messagebox.showinfo("New Project", "Started a new project")

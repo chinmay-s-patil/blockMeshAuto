@@ -10,7 +10,8 @@ class MeshData:
         self.connections = {"Layer 0": []}
         self.inter_layer_connections = []  # [(layer1, idx1, layer2, idx2)]
         self.patches = []  # [(name, patch_type, face_indices)]
-        self.hex_blocks = []  # NEW: Store hex blocks here
+        self.hex_blocks = []  # Store hex blocks here
+        self.edges = []
         
         # Project settings
         self.sketch_plane = "XY"  # XY, YZ, or ZX
@@ -119,21 +120,51 @@ class MeshData:
         return None, -1
     
     def get_3d_coords(self, layer, point_2d):
-        """Convert 2D sketch coords to 3D based on sketch plane"""
+        """
+        Convert 2D sketch coords to 3D based on sketch plane.
+        Returns (X, Y, Z) in the coordinate system where:
+        - For XY plane: X=sketch_x, Y=sketch_y, Z=layer_height
+        - This returns (X, Z, Y) format for legacy compatibility with matplotlib
+          where Z is used as the vertical axis in the plot
+        """
         x, y = point_2d
         z = self.layers[layer]
         
         if self.sketch_plane == "XY":
-            # X-horizontal, Y-vertical, Z-depth
-            return (x, z, y)  # Returns (X, Z, Y) for matplotlib
+            # Sketch: X-horizontal, Y-vertical
+            # 3D: X-horizontal, Z-vertical (layer height), Y-depth
+            # Returns (X, Z, Y) for plotting where Z is up
+            return (x, z, y)
         elif self.sketch_plane == "YZ":
-            # Y-horizontal, Z-vertical, X-depth
-            return (z, x, y)  # Returns (X=depth, Z=Y, Y=Z)
+            # Sketch: Y-horizontal, Z-vertical  
+            # 3D: Y-horizontal, X-depth, Z-vertical
+            return (z, x, y)
         elif self.sketch_plane == "ZX":
-            # Z-horizontal, X-vertical, Y-depth
-            return (y, z, x)  # Returns (X=Z, Z=X, Y=depth)
+            # Sketch: Z-horizontal, X-vertical
+            # 3D: Z-horizontal, Y-depth, X-vertical
+            return (y, z, x)
         
         return (x, z, y)  # Default XY
+    
+    def get_3d_coords_standard(self, layer, point_2d):
+        """
+        Get 3D coordinates in standard (X, Y, Z) format for OpenFOAM export.
+        This is what should be used for blockMeshDict generation.
+        """
+        x, y = point_2d
+        z_height = self.layers[layer]
+        
+        if self.sketch_plane == "XY":
+            # X from sketch x, Y from sketch y, Z from layer height
+            return (x, y, z_height)
+        elif self.sketch_plane == "YZ":
+            # X from layer (depth), Y from sketch x, Z from sketch y
+            return (z_height, x, y)
+        elif self.sketch_plane == "ZX":
+            # X from sketch y, Y from layer (depth), Z from sketch x
+            return (y, z_height, x)
+        
+        return (x, y, z_height)
     
     def get_3d_coords_from_global(self, global_idx):
         """Get 3D coordinates from global point index"""
@@ -154,7 +185,8 @@ class MeshData:
         
         for layer in layers_sorted:
             for local_idx, point_2d in enumerate(self.points[layer]):
-                coords_3d = self.get_3d_coords(layer, point_2d)
+                # Use standard format for export
+                coords_3d = self.get_3d_coords_standard(layer, point_2d)
                 points_3d.append(coords_3d)
                 point_map[(layer, local_idx)] = global_idx
                 global_idx += 1
@@ -195,7 +227,7 @@ class MeshData:
             self.connections[layer] = []
         self.inter_layer_connections = []
         self.patches = []
-        self.hex_blocks = []  # NEW: Clear hex blocks too
+        self.hex_blocks = []  # Clear hex blocks too
     
     def to_dict(self):
         """Convert mesh data to dictionary for JSON serialization"""
@@ -206,7 +238,8 @@ class MeshData:
             "connections": self.connections,
             "inter_layer_connections": self.inter_layer_connections,
             "patches": self.patches,
-            "hex_blocks": self.hex_blocks,  # NEW: Save hex blocks
+            "hex_blocks": self.hex_blocks,
+            "edges": self.edges,
             "sketch_plane": self.sketch_plane,
             "project_name": self.project_name,
             "project_description": self.project_description,
@@ -222,7 +255,8 @@ class MeshData:
         self.connections = data.get("connections", {"Layer 0": []})
         self.inter_layer_connections = data.get("inter_layer_connections", [])
         self.patches = data.get("patches", [])
-        self.hex_blocks = data.get("hex_blocks", [])  # NEW: Load hex blocks
+        self.hex_blocks = data.get("hex_blocks", [])
+        self.edges = data.get("edges", [])
         self.sketch_plane = data.get("sketch_plane", "XY")
         self.project_name = data.get("project_name", "Untitled Project")
         self.project_description = data.get("project_description", "")

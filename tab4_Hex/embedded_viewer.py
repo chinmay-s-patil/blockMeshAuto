@@ -13,7 +13,7 @@ import numpy as np
 import math
 
 
-class EmbeddedPyVistaViewer:
+class EmbeddedViewer:
     """3D viewer embedded in a tkinter frame using Canvas"""
     def __init__(self, parent_frame, mesh_data, parent_tab):
         self.parent_frame = parent_frame

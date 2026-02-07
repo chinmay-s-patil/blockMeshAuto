@@ -9,7 +9,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 import numpy as np
 import math
-from tab3_Hex.pyvista_embedded import EmbeddedPyVistaViewer
+from tab4_Hex.embedded_viewer import EmbeddedViewer
 
 
 class TabHexBlockMaking:
@@ -64,7 +64,7 @@ class TabHexBlockMaking:
         viewer_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Initialize embedded viewer
-        self.viewer = EmbeddedPyVistaViewer(viewer_frame, self.mesh_data, self)
+        self.viewer = EmbeddedViewer(viewer_frame, self.mesh_data, self)
         
         # Info label at bottom of viewer (no reset/refresh buttons here anymore)
         control_frame = tk.Frame(left_frame)

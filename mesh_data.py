@@ -10,6 +10,7 @@ class MeshData:
         self.connections = {"Layer 0": []}
         self.inter_layer_connections = []  # [(layer1, idx1, layer2, idx2)]
         self.patches = []  # [(name, patch_type, face_indices)]
+        self.hex_blocks = []  # NEW: Store hex blocks here
         
         # Project settings
         self.sketch_plane = "XY"  # XY, YZ, or ZX
@@ -194,6 +195,7 @@ class MeshData:
             self.connections[layer] = []
         self.inter_layer_connections = []
         self.patches = []
+        self.hex_blocks = []  # NEW: Clear hex blocks too
     
     def to_dict(self):
         """Convert mesh data to dictionary for JSON serialization"""
@@ -204,6 +206,7 @@ class MeshData:
             "connections": self.connections,
             "inter_layer_connections": self.inter_layer_connections,
             "patches": self.patches,
+            "hex_blocks": self.hex_blocks,  # NEW: Save hex blocks
             "sketch_plane": self.sketch_plane,
             "project_name": self.project_name,
             "project_description": self.project_description,
@@ -219,6 +222,7 @@ class MeshData:
         self.connections = data.get("connections", {"Layer 0": []})
         self.inter_layer_connections = data.get("inter_layer_connections", [])
         self.patches = data.get("patches", [])
+        self.hex_blocks = data.get("hex_blocks", [])  # NEW: Load hex blocks
         self.sketch_plane = data.get("sketch_plane", "XY")
         self.project_name = data.get("project_name", "Untitled Project")
         self.project_description = data.get("project_description", "")

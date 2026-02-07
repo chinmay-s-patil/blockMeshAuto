@@ -5,8 +5,7 @@ Dark Mode with View Controls and Rotating Axes
 
 Coordinate System Handling:
 - Reads sketch_plane from mesh_data to determine transformation
-- XY plane: points are (x,y), layer is z -> 3D is (x, y, z)
-- XZ plane: points are (x,z), layer is y -> 3D is (x, y, z) [swapped]
+- mesh_data.get_3d_coords returns (X, Z, Y) for XY plane - need to swap to (X, Y, Z)
 """
 import tkinter as tk
 from tkinter import messagebox
@@ -129,41 +128,18 @@ class EmbeddedPyVistaViewer:
         self.canvas.bind("<Button-5>", self._on_scroll)
         self.canvas.bind("<Configure>", lambda e: self.draw())
         
-    def _transform_coordinate(self, layer_name, point_2d, layer_value):
+    def _get_3d_coords_from_mesh(self, layer_name, point_2d):
         """
-        Transform from JSON coordinate system to display coordinate system.
-        
-        Based on sketch_plane setting:
-        - XY plane: point_2d = (x, y), layer_value = z -> 3D is (x, y, z)
-        - XZ plane: point_2d = (x, z), layer_value = y -> 3D is (x, y, z) [Y/Z swapped]
-        - YZ plane: point_2d = (y, z), layer_value = x -> 3D is (x, y, z) [X/Y/Z cycled]
-        
-        Display coordinate system: X (right), Y (up/forward), Z (up/height)
+        Get 3D coordinates from mesh_data and convert to standard (X, Y, Z) format.
+        mesh_data.get_3d_coords returns (X, Z, Y) for XY plane, so we swap Y and Z.
         """
-        x_2d, y_2d = point_2d
+        # Get coords from mesh_data - returns (X, Z, Y) for XY plane
+        coords = self.mesh_data.get_3d_coords(layer_name, point_2d)
+        x, z_swapped, y_swapped = coords
         
-        if self.sketch_plane == "XY":
-            # XY plane: points are (x, y), layer is z
-            x = x_2d
-            y = y_2d
-            z = layer_value
-        elif self.sketch_plane == "XZ":
-            # XZ plane: points are (x, z), layer is y
-            x = x_2d
-            y = layer_value
-            z = y_2d
-        elif self.sketch_plane == "YZ":
-            # YZ plane: points are (y, z), layer is x
-            x = layer_value
-            y = x_2d
-            z = y_2d
-        else:
-            # Default to XY
-            x = x_2d
-            y = y_2d
-            z = layer_value
-        
-        return np.array([x, y, z])
+        # mesh_data returns (X, Z, Y) but we want standard (X, Y, Z)
+        # So swap the Y and Z components
+        return np.array([x, y_swapped, z_swapped])
         
     def _rebuild_coord_cache(self):
         """Cache all global point coordinates with proper transform"""
@@ -188,7 +164,8 @@ class EmbeddedPyVistaViewer:
             if layer_name in self.mesh_data.points:
                 layer_value = self.mesh_data.layers[layer_name]
                 for local_idx, pt_2d in enumerate(self.mesh_data.points[layer_name]):
-                    coord_3d = self._transform_coordinate(layer_name, pt_2d, layer_value)
+                    # Use the mesh_data method and swap Y/Z to get standard (X, Y, Z)
+                    coord_3d = self._get_3d_coords_from_mesh(layer_name, pt_2d)
                     coords.append(coord_3d)
                     self._global_to_local[idx] = (layer_name, local_idx)
                     idx += 1
@@ -284,7 +261,7 @@ class EmbeddedPyVistaViewer:
                 self.canvas.create_oval(x-r, y-r, x+r, y+r, 
                                        fill=color, outline='white', width=1,
                                        tags=f"point_{global_idx}")
-                # Show coordinates
+                # Show coordinates - now coord is (X, Y, Z) standard
                 label = f"{global_idx}:({coord[0]:.1f},{coord[1]:.1f},{coord[2]:.1f})"
                 self.canvas.create_text(x, y-10, text=str(global_idx), 
                                        fill=color, font=('Courier', 9, 'bold'),
@@ -468,7 +445,7 @@ class EmbeddedPyVistaViewer:
                 self.selected_points.remove(clicked_point)
             else:
                 if len(self.selected_points) < 8:
-                    self.selected_points.add(clicked_point)
+                    self.selected_points.append(clicked_point)  # Use append instead of add
                 else:
                     messagebox.showwarning("Limit", "Maximum 8 points allowed")
                     return
@@ -594,19 +571,19 @@ class EmbeddedPyVistaViewer:
                 
         elif axis == 'y':
             if self._view_positive:
-                self.rotation_x = 0
-                self.rotation_y = 0
-            else:
-                self.rotation_x = 0
-                self.rotation_y = 180
-                
-        elif axis == 'z':
-            if self._view_positive:
                 self.rotation_x = -90
                 self.rotation_y = 0
             else:
                 self.rotation_x = 90
                 self.rotation_y = 0
+                
+        elif axis == 'z':
+            if self._view_positive:
+                self.rotation_x = 0
+                self.rotation_y = 0
+            else:
+                self.rotation_x = 0
+                self.rotation_y = 180
         
         self._update_view_button_labels()
         self.draw()
@@ -622,15 +599,14 @@ class EmbeddedPyVistaViewer:
     
     def hide_selected(self):
         """Hide currently selected points"""
-        self.hidden_points.update(self.selected_points)
-        self.selected_points.clear()
+        self.hidden_points.update(self.selected_points)  # this works, set.update() accepts any iterable
+        self.selected_points = []
         self.draw()
         self.parent_tab.update_point_list()
         
-    def show_only_selected(self):
-        """Show only selected points"""
-        all_points = set(range(self._total_points))
-        self.hidden_points = all_points - self.selected_points
+    def set_selection(self, global_indices):
+        """Set selection from outside"""
+        self.selected_points = list(global_indices)  # Was: set(global_indices)
         self.draw()
         
     def show_all(self):
@@ -640,12 +616,12 @@ class EmbeddedPyVistaViewer:
         
     def clear_selection(self):
         """Clear selection"""
-        self.selected_points.clear()
+        self.selected_points = []
         self.draw()
         
     def set_selection(self, global_indices):
         """Set selection from outside"""
-        self.selected_points = set(global_indices)
+        self.selected_points = list(global_indices)  # convert to list
         self.draw()
     
     # LAYER FILTERING: New method to set visible layers

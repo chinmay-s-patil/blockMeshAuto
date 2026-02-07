@@ -8,6 +8,7 @@ Vertex Order for Hex Block (OpenFOAM standard):
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 import numpy as np
+import math
 from tab3_Hex.pyvista_embedded import EmbeddedPyVistaViewer
 
 
@@ -16,10 +17,10 @@ class TabHexBlockMaking:
         self.parent = parent_frame
         self.mesh_data = mesh_data
         
-        # Block management
-        self.hex_blocks = []
+        # Block management - use mesh_data.hex_blocks for persistence
         self.selected_points = []  # List of global indices
         self.current_block_idx = None
+        self.editing_block_idx = None  # Track which block is being edited
         
         # Division settings
         self.division_mode = tk.StringVar(value="direct")
@@ -37,7 +38,15 @@ class TabHexBlockMaking:
         # Viewer
         self.viewer = None
         
+        # Edit window reference
+        self.edit_window = None
+        
         self.setup_ui()
+        
+    @property
+    def hex_blocks(self):
+        """Access hex blocks from mesh_data for persistence"""
+        return self.mesh_data.hex_blocks
         
     def setup_ui(self):
         main_frame = tk.Frame(self.parent)
@@ -90,6 +99,7 @@ class TabHexBlockMaking:
         
         # Initialize data
         self.refresh_layers()
+        self.update_block_list()  # Load any existing blocks from mesh_data
         
     def _setup_layers_tab(self):
         """Setup the Layers selection tab"""
@@ -337,6 +347,8 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
                  bg="salmon", width=12).pack(side=tk.LEFT, padx=2)
         tk.Button(btn_frame, text="Clear All", command=self.clear_all_blocks,
                  bg="lightcoral", width=12).pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_frame, text="Edit Selected", command=self.edit_block,
+                 bg="lightblue", width=12).pack(side=tk.LEFT, padx=2)
         
         # Block info display
         self.block_info = tk.Label(frame, text="", font=("Arial", 9), 
@@ -376,7 +388,8 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
     
     def on_selection_changed(self, selected_set):
         """Called by viewer when points are clicked"""
-        self.selected_points = sorted(list(selected_set))
+        # Preserve selection order - do NOT sort!
+        self.selected_points = list(selected_set)
         self.update_point_list()
         self.point_status.config(text=f"Selected: {len(self.selected_points)}/8 points")
     
@@ -414,35 +427,47 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         self.update_point_list()
         self.point_status.config(text="Selected: 0/8 points")
     
+    def _get_3d_coords_standard(self, global_idx):
+        """
+        Get 3D coordinates in standard (X, Y, Z) format.
+        mesh_data.get_3d_coords returns (X, Z, Y) for XY plane.
+        """
+        layer, local_idx = self.mesh_data.get_layer_from_global_index(global_idx)
+        point_2d = self.mesh_data.points[layer][local_idx]
+        coords_raw = self.mesh_data.get_3d_coords(layer, point_2d)
+        # Swap Y and Z: mesh_data returns (X, Z, Y), we want (X, Y, Z)
+        x, z, y = coords_raw
+        return (x, y, z)
+    
     def create_hex_block(self):
         """Create a hexahedral block from selected points"""
         if len(self.selected_points) != 8:
             messagebox.showwarning("Warning", f"Need exactly 8 points, have {len(self.selected_points)}")
             return
         
-        # Get coordinates in the order they were selected
-        # The user selects in order: 0,1,2,3 on bottom then 4,5,6,7 on top
+        # Trust the user's selection order exactly as OpenFOAM expects:
+        # User selects: 0, 1, 2, 3 on bottom (CCW from below)
+        # Then: 4, 5, 6, 7 on top (CCW from above)
+        # Vertical edges are: 0-4, 1-5, 2-6, 3-7
+        
         vertices = []
         layers_used = set()
         
         for global_idx in self.selected_points:
             layer, local_idx = self.mesh_data.get_layer_from_global_index(global_idx)
             layers_used.add(layer)
-            point_2d = self.mesh_data.points[layer][local_idx]
-            coords_3d = self.mesh_data.get_3d_coords(layer, point_2d)
+            coords_3d = self._get_3d_coords_standard(global_idx)
             vertices.append(coords_3d)
         
         if len(layers_used) != 2:
             messagebox.showerror("Error", "Points must come from exactly 2 layers (4 bottom, 4 top)")
             return
         
-        # Validate vertex ordering
-        # vertices[0:4] should be bottom layer, vertices[4:8] should be top layer
-        z_coords = [v[2] for v in vertices]
-        z_bottom_avg = sum(z_coords[0:4]) / 4
-        z_top_avg = sum(z_coords[4:8]) / 4
+        # Validate: first 4 should be bottom layer (lower Z), last 4 should be top
+        z_bottom = [v[2] for v in vertices[0:4]]
+        z_top = [v[2] for v in vertices[4:8]]
         
-        if z_bottom_avg >= z_top_avg:
+        if max(z_bottom) > min(z_top):
             messagebox.showerror("Error", 
                 "First 4 points must be on the bottom layer (lower Z),\\n"
                 "and last 4 points must be on the top layer (higher Z)")
@@ -465,8 +490,8 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
                 nz = 1
         
         block = {
-            'vertices': vertices,
-            'point_refs': self.selected_points.copy(),
+            'vertices': vertices,  # In OpenFOAM order: 0-1-2-3 bottom, 4-5-6-7 top
+            'point_refs': self.selected_points.copy(),  # Store the global indices used
             'divisions': (nx, ny, nz),
             'grading_type': self.grading_type.get(),
             'grading_params': {'x': self.grading_x.get(),
@@ -474,7 +499,8 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
                              'z': self.grading_z.get()}
         }
         
-        self.hex_blocks.append(block)
+        # Add to mesh_data.hex_blocks for persistence
+        self.mesh_data.hex_blocks.append(block)
         self.update_block_list()
         self.clear_point_selection()
         if self.viewer:
@@ -485,11 +511,12 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
                            f"Grading: ({self.grading_x.get()}, {self.grading_y.get()}, {self.grading_z.get()})")
     
     def _calculate_divisions(self, vertices, cell_size):
-        """Calculate divisions from cell size"""
-        # X edges: 0-1, 3-2, 4-5, 7-6 (horizontal in X direction)
+        """Calculate divisions from cell size using OpenFOAM edge definitions"""
+        # OpenFOAM hex edge definitions:
+        # X edges: 0-1, 3-2, 4-5, 7-6
         x_edges = [np.linalg.norm(np.array(vertices[i]) - np.array(vertices[j]))
-                   for i, j in [(0,1), (2,3), (4,5), (6,7)]]
-        # Y edges: 1-2, 0-3, 5-6, 4-7 (horizontal in Y direction)  
+                   for i, j in [(0,1), (3,2), (4,5), (7,6)]]
+        # Y edges: 1-2, 0-3, 5-6, 4-7
         y_edges = [np.linalg.norm(np.array(vertices[i]) - np.array(vertices[j]))
                    for i, j in [(1,2), (0,3), (5,6), (4,7)]]
         # Z edges: 0-4, 1-5, 2-6, 3-7 (vertical)
@@ -504,7 +531,7 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
     def update_block_list(self):
         """Update block list display"""
         self.block_listbox.delete(0, tk.END)
-        for i, block in enumerate(self.hex_blocks):
+        for i, block in enumerate(self.mesh_data.hex_blocks):
             nx, ny, nz = block['divisions']
             grading = block['grading_type']
             self.block_listbox.insert(tk.END, f"Block {i}: {nx}×{ny}×{nz}, {grading}")
@@ -515,10 +542,126 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         if sel:
             self.current_block_idx = sel[0]
             # Show block info
-            block = self.hex_blocks[self.current_block_idx]
+            block = self.mesh_data.hex_blocks[self.current_block_idx]
             verts = block['vertices']
             info = f"Vertices: {len(verts)}\\nDivisions: {block['divisions']}\\nGrading: {block['grading_params']}"
             self.block_info.config(text=info)
+            
+            # Highlight the selected block's points in the viewer
+            if self.viewer and block.get('point_refs'):
+                self.viewer.set_selection(set(block['point_refs']))
+    
+    def edit_block(self):
+        """Open edit dialog for selected block"""
+        if self.current_block_idx is None:
+            messagebox.showwarning("Warning", "Select a block to edit first")
+            return
+        
+        # Close existing edit window if open
+        if self.edit_window is not None and self.edit_window.winfo_exists():
+            self.edit_window.destroy()
+        
+        block = self.mesh_data.hex_blocks[self.current_block_idx]
+        self.editing_block_idx = self.current_block_idx
+        
+        # Create edit window
+        self.edit_window = tk.Toplevel(self.parent)
+        self.edit_window.title(f"Edit Block {self.current_block_idx}")
+        self.edit_window.geometry("350x500")
+        self.edit_window.transient(self.parent)  # Stay on top of parent
+        self.edit_window.grab_set()  # Modal
+        
+        # Create form
+        frame = tk.Frame(self.edit_window, padx=10, pady=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(frame, text=f"Editing Block {self.current_block_idx}", 
+                font=("Arial", 12, "bold")).pack(pady=(0, 10))
+        
+        # Divisions
+        div_frame = tk.LabelFrame(frame, text="Divisions", padx=5, pady=5)
+        div_frame.pack(fill=tk.X, pady=5)
+        
+        nx, ny, nz = block['divisions']
+        
+        tk.Label(div_frame, text="X divisions:").pack(anchor=tk.W)
+        nx_var = tk.IntVar(value=nx)
+        tk.Entry(div_frame, textvariable=nx_var).pack(fill=tk.X)
+        
+        tk.Label(div_frame, text="Y divisions:").pack(anchor=tk.W)
+        ny_var = tk.IntVar(value=ny)
+        tk.Entry(div_frame, textvariable=ny_var).pack(fill=tk.X)
+        
+        tk.Label(div_frame, text="Z divisions:").pack(anchor=tk.W)
+        nz_var = tk.IntVar(value=nz)
+        tk.Entry(div_frame, textvariable=nz_var).pack(fill=tk.X)
+        
+        # Grading
+        grade_frame = tk.LabelFrame(frame, text="Grading", padx=5, pady=5)
+        grade_frame.pack(fill=tk.X, pady=5)
+        
+        gp = block['grading_params']
+        
+        tk.Label(grade_frame, text="X ratio:").pack(anchor=tk.W)
+        gx_var = tk.DoubleVar(value=gp['x'])
+        tk.Entry(grade_frame, textvariable=gx_var).pack(fill=tk.X)
+        
+        tk.Label(grade_frame, text="Y ratio:").pack(anchor=tk.W)
+        gy_var = tk.DoubleVar(value=gp['y'])
+        tk.Entry(grade_frame, textvariable=gy_var).pack(fill=tk.X)
+        
+        tk.Label(grade_frame, text="Z ratio:").pack(anchor=tk.W)
+        gz_var = tk.DoubleVar(value=gp['z'])
+        tk.Entry(grade_frame, textvariable=gz_var).pack(fill=tk.X)
+        
+        # Grading type
+        tk.Label(frame, text="Grading Type:").pack(anchor=tk.W, pady=(10, 0))
+        grading_type_var = tk.StringVar(value=block['grading_type'])
+        tk.OptionMenu(frame, grading_type_var, "simpleGrading", "edgeGrading", "multiGrading").pack(fill=tk.X)
+        
+        # Buttons
+        btn_frame = tk.Frame(frame)
+        btn_frame.pack(fill=tk.X, pady=20)
+        
+        def save_changes():
+            # Update block with new values
+            block['divisions'] = (nx_var.get(), ny_var.get(), nz_var.get())
+            block['grading_params'] = {
+                'x': gx_var.get(),
+                'y': gy_var.get(),
+                'z': gz_var.get()
+            }
+            block['grading_type'] = grading_type_var.get()
+            
+            self.update_block_list()
+            if self.viewer:
+                self.viewer.draw()
+            self.edit_window.destroy()
+            messagebox.showinfo("Success", "Block updated!")
+        
+        def highlight_vertices():
+            """Highlight the vertices of this block in the 3D view"""
+            if self.viewer and block.get('point_refs'):
+                self.viewer.set_selection(set(block['point_refs']))
+                # Switch to points tab to see selection
+                self.notebook.select(self.tab_points)
+        
+        tk.Button(btn_frame, text="💾 Save Changes", command=save_changes,
+                 bg="lightgreen", font=("Arial", 10, "bold")).pack(fill=tk.X, pady=2)
+        tk.Button(btn_frame, text="👁 Highlight Vertices", command=highlight_vertices,
+                 bg="lightblue").pack(fill=tk.X, pady=2)
+        tk.Button(btn_frame, text="❌ Cancel", command=self.edit_window.destroy,
+                 bg="salmon").pack(fill=tk.X, pady=2)
+        
+        # Show current vertices info
+        info_frame = tk.LabelFrame(frame, text="Current Vertices", padx=5, pady=5)
+        info_frame.pack(fill=tk.X, pady=5)
+        
+        verts = block['vertices']
+        info_text = ""
+        for i, v in enumerate(verts):
+            info_text += f"{i}: ({v[0]:.2f}, {v[1]:.2f}, {v[2]:.2f})\\n"
+        tk.Label(info_frame, text=info_text, font=("Courier", 8), justify=tk.LEFT).pack(anchor=tk.W)
     
     def delete_block(self):
         """Delete selected block"""
@@ -526,7 +669,7 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
             messagebox.showwarning("Warning", "Select a block first")
             return
         if messagebox.askyesno("Confirm", "Delete block?"):
-            del self.hex_blocks[self.current_block_idx]
+            del self.mesh_data.hex_blocks[self.current_block_idx]
             self.current_block_idx = None
             self.block_info.config(text="")
             self.update_block_list()
@@ -535,10 +678,10 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
     
     def clear_all_blocks(self):
         """Clear all blocks"""
-        if not self.hex_blocks:
+        if not self.mesh_data.hex_blocks:
             return
         if messagebox.askyesno("Confirm", "Delete all blocks?"):
-            self.hex_blocks = []
+            self.mesh_data.hex_blocks.clear()
             self.current_block_idx = None
             self.block_info.config(text="")
             self.update_block_list()
@@ -547,10 +690,11 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
     
     def get_hex_blocks(self):
         """Get all hex blocks"""
-        return self.hex_blocks
+        return self.mesh_data.hex_blocks
     
     def cleanup(self):
         """Call when closing"""
         if self.viewer:
             self.viewer.close()
-            
+        if self.edit_window is not None and self.edit_window.winfo_exists():
+            self.edit_window.destroy()

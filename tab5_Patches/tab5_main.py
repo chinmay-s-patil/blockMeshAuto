@@ -1,10 +1,21 @@
 """
 Tab 5: 3D Hex Block View & Patch Assignment
 Renders hex blocks with internal face hiding and allows patch assignment
+
+FIXES:
+- Initialize _rotate_start to prevent AttributeError
+- Use middle mouse button (Button-2) for rotation instead of left
+- Add Hide/Select mode toggle
+- Fix patches data structure (dict instead of list)
+- Added Show All button to unhide faces
+- Fixed fit_all to properly calculate zoom
+- Axes now in bottom right corner
+- Added Patch Normals tab for editing face normals
 """
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import math
+import numpy as np
 
 
 class Tab5HexPatches:
@@ -38,14 +49,38 @@ class Tab5HexPatches:
             'text_fg': '#d4d4d4'
         }
         
-        # Initialize patches storage if not exists
+        # FIX: Initialize patches storage - convert old list format to dict if needed
         if not hasattr(self.mesh_data, 'patches'):
             self.mesh_data.patches = {}
+        elif isinstance(self.mesh_data.patches, list):
+            # Convert old list format to dict format
+            old_patches = self.mesh_data.patches
+            self.mesh_data.patches = {}
+            for i, item in enumerate(old_patches):
+                if isinstance(item, tuple) and len(item) >= 2:
+                    name = item[0]
+                    patch_type = item[1]
+                    faces = item[2] if len(item) > 2 else []
+                    self.mesh_data.patches[name] = {
+                        'name': name,
+                        'type': patch_type,
+                        'faces': faces,
+                        'parameters': {}
+                    }
         
         # Renderer reference
         self.renderer = None
         self.panning = False
         self.pan_start = (0, 0)
+        
+        # FIX: Initialize rotation tracking to prevent AttributeError
+        self._rotate_start = (0, 0)
+        
+        # FIX: Add hide mode tracking
+        self.hide_mode = False  # False = Select mode, True = Hide mode
+        
+        # Reference to normals tab
+        self.normals_tab = None
         
         self.setup_ui()
 
@@ -58,7 +93,7 @@ class Tab5HexPatches:
         left_frame = tk.Frame(main_frame, bg=self.colors['bg'])
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        tk.Label(left_frame, text="3D Hex Block View - Click faces to select", 
+        tk.Label(left_frame, text="3D Hex Block View - Click faces to select/hide", 
                 font=("Arial", 12, "bold"),
                 bg=self.colors['bg'], fg=self.colors['fg']).pack(pady=5)
         
@@ -72,6 +107,22 @@ class Tab5HexPatches:
         # Canvas controls frame
         controls_frame = tk.Frame(left_frame, bg=self.colors['bg'])
         controls_frame.pack(fill=tk.X, pady=5)
+        
+        # FIX: Add mode toggle button
+        self.mode_button = tk.Button(controls_frame, text="Mode: Select", 
+                 command=self._toggle_mode,
+                 bg=self.colors['success'], fg=self.colors['bg'],
+                 font=("Arial", 9, "bold"), relief=tk.FLAT,
+                 activebackground='#3db89f', width=12)
+        self.mode_button.pack(side=tk.LEFT, padx=5)
+        
+        # FIX: Add Show All button to unhide faces
+        self.show_all_button = tk.Button(controls_frame, text="Show All", 
+                 command=self._show_all_faces,
+                 bg=self.colors['accent'], fg=self.colors['button_fg'],
+                 font=("Arial", 9, "bold"), relief=tk.FLAT,
+                 activebackground=self.colors['button_active'])
+        self.show_all_button.pack(side=tk.LEFT, padx=5)
         
         tk.Button(controls_frame, text="Reset View", 
                  command=self._reset_view,
@@ -91,8 +142,9 @@ class Tab5HexPatches:
                  font=("Arial", 9, "bold"), relief=tk.FLAT,
                  activebackground='#3db89f').pack(side=tk.LEFT, padx=5)
         
+        # FIX: Updated instructions for middle mouse button
         tk.Label(controls_frame, 
-                text="Left: Select | Right: Pan | Scroll: Zoom | Drag: Rotate",
+                text="Left: Select/Hide | Middle: Rotate | Right: Pan | Scroll: Zoom",
                 font=("Arial", 9), fg=self.colors['fg'], 
                 bg=self.colors['bg']).pack(side=tk.LEFT, padx=10)
 
@@ -145,22 +197,51 @@ class Tab5HexPatches:
         bind_mousewheel(right_frame)
         right_canvas.bind("<MouseWheel>", on_mousewheel)
         
-        # Status section
-        self._setup_status_section(right_frame)
+        # Create Notebook for tabs
+        style = ttk.Style()
+        style.theme_use('default')
+        style.configure("TNotebook", background=self.colors['secondary'])
+        style.configure("TNotebook.Tab", background=self.colors['secondary'],
+                       foreground=self.colors['fg'])
+        style.map("TNotebook.Tab", background=[("selected", self.colors['accent'])])
         
-        # Patch assignment panel
+        self.notebook = ttk.Notebook(right_frame)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Create tabs
+        self.tab_patches = tk.Frame(self.notebook, bg=self.colors['secondary'])
+        self.tab_assignment = tk.Frame(self.notebook, bg=self.colors['secondary'])
+        self.tab_normals = tk.Frame(self.notebook, bg=self.colors['secondary'])
+        
+        self.notebook.add(self.tab_patches, text="Patches")
+        self.notebook.add(self.tab_assignment, text="Assign")
+        self.notebook.add(self.tab_normals, text="Normals")
+        
+        # Status section (in patches tab)
+        self._setup_status_section(self.tab_patches)
+        
+        # Patch list panel (in patches tab)
+        from tab5_Patches.tab5_patch_panels import PatchListPanel
+        self.patch_list_panel = PatchListPanel(
+            self.tab_patches, self.mesh_data, self.colors,
+            on_select_callback=self._on_patch_selected
+        )
+        
+        # Patch assignment panel (in assign tab)
         from tab5_Patches.tab5_patch_panels import PatchAssignmentPanel
         self.patch_panel = PatchAssignmentPanel(
-            right_frame, self.mesh_data, self.colors,
+            self.tab_assignment, self.mesh_data, self.colors,
             on_assign_callback=self._on_patch_assigned
         )
         
-        # Patch list panel
-        from tab5_Patches.tab5_patch_panels import PatchListPanel
-        self.patch_list_panel = PatchListPanel(
-            right_frame, self.mesh_data, self.colors,
-            on_select_callback=self._on_patch_selected
+        # Patch normals tab (in normals tab)
+        from tab5_Patches.tab5_patch_normals import PatchNormalsTab
+        self.normals_tab = PatchNormalsTab(
+            self.tab_normals, self.mesh_data, self.colors, self.renderer
         )
+        
+        # Bind tab change event
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
         
         # Force update
         right_frame.update_idletasks()
@@ -172,7 +253,52 @@ class Tab5HexPatches:
         # Initialize renderer
         self._init_renderer()
         
-    # Part 4 - Status section and canvas bindings
+    def _on_tab_changed(self, event):
+        """Handle tab change in notebook"""
+        current_tab = self.notebook.index(self.notebook.select())
+        
+        # Tab indices: 0=Patches, 1=Assign, 2=Normals
+        if current_tab == 2 and self.normals_tab:
+            # Normals tab selected - enable patch edit mode
+            if self.renderer:
+                self.renderer.set_patch_edit_mode(True, self.normals_tab)
+                self.normals_tab.renderer = self.renderer  # Update renderer reference
+        else:
+            # Other tab selected - disable patch edit mode
+            if self.renderer:
+                self.renderer.set_patch_edit_mode(False)
+                
+    # FIX: Add mode toggle method
+    def _toggle_mode(self):
+        """Toggle between Select and Hide modes"""
+        self.hide_mode = not self.hide_mode
+        
+        if self.hide_mode:
+            self.mode_button.config(
+                text="Mode: Hide",
+                bg=self.colors['warning'],
+                fg=self.colors['bg']
+            )
+        else:
+            self.mode_button.config(
+                text="Mode: Select",
+                bg=self.colors['success'],
+                fg=self.colors['bg']
+            )
+
+    # FIX: Add Show All method
+    def _show_all_faces(self):
+        """Show all faces that were hidden"""
+        if self.renderer:
+            self.renderer.show_all_faces()
+            hidden_count = self.renderer.get_hidden_face_count()
+            if hidden_count > 0:
+                self.status_label.config(
+                    text=f"Showed all hidden faces ({hidden_count} were hidden)",
+                    fg=self.colors['success']
+                )
+            else:
+                self.status_label.config(text="No hidden faces to show", fg=self.colors['fg'])
 
     def _setup_status_section(self, parent):
         """Setup the status/info section"""
@@ -215,14 +341,25 @@ class Tab5HexPatches:
         
     def _setup_canvas_bindings(self):
         """Setup mouse bindings for canvas interaction"""
-        self.canvas.bind("<Button-1>", self._on_left_click)
-        self.canvas.bind("<B1-Motion>", self._on_rotate)
+        # FIX: Left click for selection/hiding (no drag)
+        self.canvas.bind("<Button-1>", self._on_face_click)
+        
+        # FIX: Middle mouse button (Button-2) for rotation
+        self.canvas.bind("<Button-2>", self._on_middle_click)
+        self.canvas.bind("<B2-Motion>", self._on_rotate)
+        self.canvas.bind("<ButtonRelease-2>", self._on_rotate_end)
+        
+        # Right click for panning
         self.canvas.bind("<Button-3>", self._on_right_click)
         self.canvas.bind("<B3-Motion>", self._on_pan)
         self.canvas.bind("<ButtonRelease-3>", self._on_pan_end)
+        
+        # Zoom
         self.canvas.bind("<MouseWheel>", self._on_zoom)
         self.canvas.bind("<Button-4>", self._on_zoom)
         self.canvas.bind("<Button-5>", self._on_zoom)
+        
+        # Resize
         self.canvas.bind("<Configure>", lambda e: self._draw())
         
     def _init_renderer(self):
@@ -230,6 +367,11 @@ class Tab5HexPatches:
         from tab5_Patches.tab5_hex_renderer import HexBlockRenderer
         self.renderer = HexBlockRenderer(self.canvas, self.mesh_data)
         self.renderer.on_selection_changed = self._on_face_selection_changed
+        
+        # Update normals tab with renderer reference
+        if self.normals_tab:
+            self.normals_tab.renderer = self.renderer
+            
         self._update_status()
         self._draw()
         
@@ -238,14 +380,66 @@ class Tab5HexPatches:
         if self.renderer:
             self.renderer.draw()
             
+    # FIX: Separate click handler for face selection/hiding
+    def _on_face_click(self, event):
+        """Handle left click for face selection or hiding"""
+        if not self.renderer:
+            return
+        
+        # Let renderer handle the click, but modify behavior based on mode
+        # The renderer's click handler will be triggered through its canvas binding
+        pass
+    
     def _on_face_selection_changed(self, selected_faces):
         """Handle face selection change from renderer"""
-        self.patch_panel.set_selected_faces(selected_faces)
-        self.selected_count_label.config(
-            text="Selected faces: %d" % len(selected_faces)
-        )
+        # FIX: In hide mode, hide selected faces instead of selecting them
+        if self.hide_mode and self.renderer:
+            # Hide the clicked faces
+            for face_id in selected_faces:
+                # Mark face as hidden
+                for face in self.renderer.all_faces:
+                    if face['face_id'] == face_id:
+                        face['is_visible'] = False
+            
+            # Clear selection and redraw
+            self.renderer.selected_faces.clear()
+            self.renderer.draw()
+            
+            # Update hidden count
+            hidden_count = self.renderer.get_hidden_face_count()
+            self.status_label.config(
+                text=f"Hide mode: {len(selected_faces)} faces hidden ({hidden_count} total hidden)",
+                fg=self.colors['warning']
+            )
+        else:
+            # Normal select mode
+            self.patch_panel.set_selected_faces(selected_faces)
+            self.selected_count_label.config(
+                text="Selected faces: %d" % len(selected_faces)
+            )
         
-    # Part 5 - Patch callbacks and view controls
+    # FIX: Middle mouse button handlers for rotation
+    def _on_middle_click(self, event):
+        """Handle middle mouse button press (start rotation)"""
+        self._rotate_start = (event.x, event.y)
+        
+    def _on_rotate(self, event):
+        """Handle rotation drag (middle mouse button)"""
+        if not self.renderer:
+            return
+        
+        dx = event.x - self._rotate_start[0]
+        dy = event.y - self._rotate_start[1]
+        
+        self.renderer.rotation_y += dx * 0.5
+        self.renderer.rotation_x -= dy * 0.5
+        
+        self._rotate_start = (event.x, event.y)
+        self.renderer.draw()
+        
+    def _on_rotate_end(self, event):
+        """Handle rotation end"""
+        pass
 
     def _on_patch_assigned(self, patch_data):
         """Handle patch assignment"""
@@ -254,10 +448,8 @@ class Tab5HexPatches:
                 self.renderer.clear_selection()
             return
         
-        # Store patch in mesh_data
+        # Store patch in mesh_data (now a dict)
         patch_name = patch_data['name']
-        if not hasattr(self.mesh_data, 'patches'):
-            self.mesh_data.patches = {}
         
         # If patch exists, append faces
         if patch_name in self.mesh_data.patches:
@@ -266,6 +458,7 @@ class Tab5HexPatches:
             new_faces = set(patch_data['faces'])
             existing['faces'] = list(existing_faces | new_faces)
         else:
+            print(patch_name)
             self.mesh_data.patches[patch_name] = patch_data
         
         # Update UI
@@ -286,7 +479,7 @@ class Tab5HexPatches:
             
     def _update_status(self):
         """Update status labels"""
-        num_blocks = len(getattr(self.mesh_data, 'hex_blocks', []))
+        num_blocks = len(getattr(self.mesh_data, 'hex_faces', []))
         self.block_count_label.config(text="Blocks: %d" % num_blocks)
         
         if self.renderer:
@@ -314,56 +507,57 @@ class Tab5HexPatches:
             self._update_status()
             self.renderer.draw()
             
-    # Part 6 - Fit all and mouse handlers
-
     def _fit_all(self):
-        """Fit all blocks in view"""
+        """Fit all blocks in view - FIXED to properly calculate zoom"""
         if not self.renderer or not self.renderer.all_faces:
             return
         
-        # Calculate bounding box of all vertices
+        # Calculate bounding box of all visible vertices
         all_verts = []
         for face in self.renderer.all_faces:
-            all_verts.extend(face['vertices'])
+            if face['is_visible']:
+                all_verts.extend(face['vertices'])
         
         if not all_verts:
             return
         
-        import numpy as np
         verts = np.array(all_verts)
         min_coords = verts.min(axis=0)
         max_coords = verts.max(axis=0)
         
-        # Reset pan
+        # Calculate center of bounding box
+        center = (min_coords + max_coords) / 2.0
+        
+        # Reset pan to center the view
         self.renderer.pan_x = 0
         self.renderer.pan_y = 0
         
-        # Calculate zoom to fit
+        # Get canvas dimensions
         canvas_w = self.canvas.winfo_width()
         canvas_h = self.canvas.winfo_height()
         
-        max_range = np.max(max_coords - min_coords)
-        if max_range > 0:
-            self.renderer.zoom = min(canvas_w, canvas_h) / (max_range * 3)
+        # Calculate the bounding box dimensions
+        bbox_size = max_coords - min_coords
+        max_bbox_dim = np.max(bbox_size)
         
-        self.renderer.draw()
-        
-    def _on_left_click(self, event):
-        """Handle left click - selection is handled by renderer"""
-        self._rotate_start = (event.x, event.y)
-        
-    def _on_rotate(self, event):
-        """Handle rotation drag"""
-        if not self.renderer:
+        if max_bbox_dim <= 0:
             return
         
-        dx = event.x - self._rotate_start[0]
-        dy = event.y - self._rotate_start[1]
+        # Calculate zoom to fit the bounding box with 20% padding
+        # The projection scale factor is 5 (from _project method)
+        padding = 0.8  # 20% padding
         
-        self.renderer.rotation_y += dx * 0.5
-        self.renderer.rotation_x -= dy * 0.5
+        # Calculate zoom based on canvas size and bounding box
+        # We want: max_bbox_dim * zoom * 5 <= min(canvas_w, canvas_h) * padding
+        target_zoom_w = (canvas_w * padding) / (max_bbox_dim * 5)
+        target_zoom_h = (canvas_h * padding) / (max_bbox_dim * 5)
         
-        self._rotate_start = (event.x, event.y)
+        # Use the smaller zoom to ensure it fits in both dimensions
+        self.renderer.zoom = min(target_zoom_w, target_zoom_h)
+        
+        # Clamp zoom to reasonable limits
+        self.renderer.zoom = max(0.01, min(1000.0, self.renderer.zoom))
+        
         self.renderer.draw()
         
     def _on_right_click(self, event):

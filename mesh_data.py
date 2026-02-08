@@ -9,7 +9,7 @@ class MeshData:
         self.points = {"Layer 0": []}
         self.connections = {"Layer 0": []}
         self.inter_layer_connections = []  # [(layer1, idx1, layer2, idx2)]
-        self.patches = []  # [(name, patch_type, face_indices)]
+        self.patches = {}  # [(name, patch_type, face_indices)]
         self.hex_blocks = []  # Store hex blocks here
         self.edges = []
         

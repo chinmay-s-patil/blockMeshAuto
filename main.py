@@ -25,7 +25,7 @@ from tab6_export.tab6_main import TabExport
 class MeshBuilderApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("OpenFOAM blockMesh Builder - Dark Mode")
+        self.root.title("OpenFOAM blockMesh Builder")
         self.root.geometry("1400x900")
         
         # Dark mode colors

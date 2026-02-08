@@ -441,6 +441,37 @@ Units:      {self.mesh_data.unit_system}"""
         
         return issues
     
+    def _build_face_id_mapping(self):
+        """Build a mapping from face_id to vertex global indices"""
+        face_id_to_vertices = {}
+
+        if not hasattr(self.mesh_data, 'hex_blocks') or not self.mesh_data.hex_blocks:
+            return face_id_to_vertices
+
+        # Face definitions for a hex block (vertex indices for each face)
+        face_definitions = [
+            ("bottom", [0, 3, 2, 1]),  # Note: reversed for outward normal
+            ("top", [4, 5, 6, 7]),
+            ("front", [0, 1, 5, 4]),
+            ("back", [3, 7, 6, 2]),
+            ("left", [0, 4, 7, 3]),
+            ("right", [1, 2, 6, 5])
+        ]
+
+        face_id = 0
+        for block_idx, block in enumerate(self.mesh_data.hex_blocks):
+            point_refs = block.get('point_refs', [])
+            if len(point_refs) != 8:
+                continue
+
+            for face_name, face_vertex_indices in face_definitions:
+                # Get the global point indices for this face
+                face_global_indices = [point_refs[i] for i in face_vertex_indices]
+                face_id_to_vertices[face_id] = face_global_indices
+                face_id += 1
+
+        return face_id_to_vertices
+
     def generate_blockmesh_dict(self):
         """Generate the complete blockMeshDict content"""
         lines = []
@@ -520,29 +551,38 @@ Units:      {self.mesh_data.unit_system}"""
         # Patches
         lines.append("boundary")
         lines.append("(")
-        
+
+        # Build face ID to vertex indices mapping from hex blocks
+        face_id_to_vertices = self._build_face_id_mapping()
+
         for patch_name, patch_data in self.mesh_data.patches.items():
             # Handle both dict and tuple formats
             if isinstance(patch_data, dict):
                 patch_type = patch_data.get('type', 'patch')
-                face_indices = patch_data.get('faces', [])
+                face_ids = patch_data.get('faces', [])
             else:
                 patch_type = patch_data[1] if len(patch_data) > 1 else 'patch'
-                face_indices = patch_data[2] if len(patch_data) > 2 else []
-            
+                face_ids = patch_data[2] if len(patch_data) > 2 else []
+
             lines.append(f"    {patch_name}")
             lines.append("    {")
             lines.append(f"        type {patch_type};")
             lines.append("        faces")
             lines.append("        (")
-            
-            for face in face_indices:
-                if isinstance(face, (list, tuple)) and len(face) == 4:
-                    lines.append(f"            ({face[0]} {face[1]} {face[2]} {face[3]})")
-            
+
+            # Convert face IDs to vertex indices
+            for face_id in face_ids:
+                if isinstance(face_id, (list, tuple)) and len(face_id) == 4:
+                    # Already in vertex indices format (legacy)
+                    lines.append(f"            ({face_id[0]} {face_id[1]} {face_id[2]} {face_id[3]})")
+                elif isinstance(face_id, int) and face_id in face_id_to_vertices:
+                    # Look up vertex indices from face ID
+                    verts = face_id_to_vertices[face_id]
+                    lines.append(f"            ({verts[0]} {verts[1]} {verts[2]} {verts[3]})")
+
             lines.append("        );")
             lines.append("    }")
-        
+
         lines.append(");")
         lines.append("")
         
@@ -553,7 +593,7 @@ Units:      {self.mesh_data.unit_system}"""
         lines.append("")
         lines.append("// ************************************************************************* //")
         
-        return '\\n'.join(lines)
+        return '\n'.join(lines)
     
     def export_blockmesh(self):
         """Export to blockMeshDict file"""

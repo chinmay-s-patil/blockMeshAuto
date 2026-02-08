@@ -8,6 +8,7 @@ import numpy as np
 
 
 class TabEdgeEditor:
+
     def __init__(self, parent_frame, mesh_data):
         self.parent = parent_frame
         self.mesh_data = mesh_data
@@ -361,7 +362,50 @@ class TabEdgeEditor:
             tk.Radiobutton(type_frame, text=label, variable=self.current_edge_type,
                           value=edge_type, command=self._on_edge_type_changed,
                           font=("Arial", 10), bg=self.colors['secondary'],
-                          fg=self.colors['fg'], selectcolor=self.colors['bg']).pack(anchor=tk.W, pady=2)
+                          fg=self.colors['fg'], selectcolor=self.colors['bg'],
+                          activebackground=self.colors['secondary'],
+                          activeforeground=self.colors['accent']).pack(anchor=tk.W, pady=2)
+
+        # Manual Point Entry Section (moved higher for visibility)
+        manual_entry_frame = tk.LabelFrame(frame, text="Manual Point Entry", padx=10, pady=10,
+                                          bg=self.colors['secondary'], fg=self.colors['fg'],
+                                          highlightbackground=self.colors['border'])
+        manual_entry_frame.pack(fill=tk.X, pady=10)
+        
+        tk.Label(manual_entry_frame, text="Enter coordinates (X, Y, Z):", 
+                font=("Arial", 9), bg=self.colors['secondary'],
+                fg=self.colors['fg']).pack(anchor=tk.W, pady=(0, 5))
+        
+        coord_frame = tk.Frame(manual_entry_frame, bg=self.colors['secondary'])
+        coord_frame.pack(fill=tk.X, pady=5)
+        
+        for i, label in enumerate(['X:', 'Y:', 'Z:']):
+            col_frame = tk.Frame(coord_frame, bg=self.colors['secondary'])
+            col_frame.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+            tk.Label(col_frame, text=label, bg=self.colors['secondary'], 
+                    fg=self.colors['fg'], width=3).pack(side=tk.LEFT)
+            entry = tk.Entry(col_frame, textvariable=self.manual_coords[i], width=12,
+                    bg=self.colors['text_bg'], fg=self.colors['text_fg'],
+                    insertbackground=self.colors['fg'])
+            entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
+            # Allow Enter key to add point
+            entry.bind('<Return>', lambda e: self._add_manual_point())
+        
+        # Buttons for manual entry
+        manual_btn_frame = tk.Frame(manual_entry_frame, bg=self.colors['secondary'])
+        manual_btn_frame.pack(fill=tk.X, pady=5)
+        tk.Button(manual_btn_frame, text="Set as Start Point", 
+                 command=lambda: self._enter_point_manually('start'),
+                 bg=self.colors['success'], fg=self.colors['bg'],
+                 font=("Arial", 9, "bold")).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        tk.Button(manual_btn_frame, text="Set as End Point", 
+                 command=lambda: self._enter_point_manually('end'),
+                 bg=self.colors['error'], fg=self.colors['button_fg'],
+                 font=("Arial", 9, "bold")).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        tk.Button(manual_btn_frame, text="Add Intermediate", 
+                 command=self._add_manual_point,
+                 bg=self.colors['button_bg'], fg=self.colors['button_fg'],
+                 font=("Arial", 9, "bold")).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
 
         self.config_frame = tk.LabelFrame(frame, text="Configuration", padx=10, pady=10,
                                          bg=self.colors['secondary'], fg=self.colors['fg'],
@@ -391,30 +435,15 @@ class TabEdgeEditor:
 
         btn_frame = tk.Frame(self.spline_config, bg=self.colors['secondary'])
         btn_frame.pack(fill=tk.X)
-        tk.Button(btn_frame, text="Add Point (Click)", command=self._add_spline_point,
-                 bg=self.colors['add_bg'], fg=self.colors['bg']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        tk.Button(btn_frame, text="Add Point (Manual)", command=self._add_manual_point,
-                 bg=self.colors['button_bg'], fg=self.colors['button_fg']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        tk.Button(btn_frame, text="Remove Last", command=self._remove_spline_point,
-                 bg=self.colors['error'], fg=self.colors['button_fg']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        tk.Button(btn_frame, text="Add Point (Click 3D)", command=self._add_spline_point,
+                 bg=self.colors['add_bg'], fg=self.colors['bg'],
+                 font=("Arial", 9)).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        tk.Button(btn_frame, text="Remove Selected", command=self._remove_spline_point,
+                 bg=self.colors['error'], fg=self.colors['button_fg'],
+                 font=("Arial", 9)).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
         tk.Button(btn_frame, text="Clear All", command=self._clear_spline_points,
-                 bg=self.colors['warning'], fg=self.colors['bg']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-
-        # FIX 1: Manual point entry frame
-        self.manual_frame = tk.LabelFrame(self.spline_config, text="Manual Point Entry", 
-                                         padx=5, pady=5,
-                                         bg=self.colors['secondary'], fg=self.colors['fg'],
-                                         highlightbackground=self.colors['border'])
-        self.manual_frame.pack(fill=tk.X, pady=5)
-        
-        coord_frame = tk.Frame(self.manual_frame, bg=self.colors['secondary'])
-        coord_frame.pack(fill=tk.X)
-        
-        for i, label in enumerate(['X:', 'Y:', 'Z:']):
-            tk.Label(coord_frame, text=label, bg=self.colors['secondary'], 
-                    fg=self.colors['fg']).grid(row=0, column=i*2, sticky=tk.E)
-            tk.Entry(coord_frame, textvariable=self.manual_coords[i], width=10,
-                    bg=self.colors['text_bg'], fg=self.colors['text_fg']).grid(row=0, column=i*2+1, padx=2)
+                 bg=self.colors['warning'], fg=self.colors['bg'],
+                 font=("Arial", 9)).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
 
         status_frame = tk.LabelFrame(frame, text="Selection Status", padx=10, pady=10,
                                     bg=self.colors['secondary'], fg=self.colors['fg'],
@@ -425,16 +454,6 @@ class TabEdgeEditor:
                                     font=("Courier", 10), justify=tk.LEFT,
                                     bg=self.colors['secondary'], fg=self.colors['success'])
         self.status_label.pack(anchor=tk.W)
-        
-        # FIX 1: Manual entry buttons for start/end
-        point_btn_frame = tk.Frame(status_frame, bg=self.colors['secondary'])
-        point_btn_frame.pack(fill=tk.X, pady=5)
-        tk.Button(point_btn_frame, text="Enter Start Point Manually", 
-                 command=lambda: self._enter_point_manually('start'),
-                 bg=self.colors['button_bg'], fg=self.colors['button_fg']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        tk.Button(point_btn_frame, text="Enter End Point Manually", 
-                 command=lambda: self._enter_point_manually('end'),
-                 bg=self.colors['button_bg'], fg=self.colors['button_fg']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
 
         action_frame = tk.Frame(frame, bg=self.colors['secondary'])
         action_frame.pack(fill=tk.X, pady=20)
@@ -446,16 +465,25 @@ class TabEdgeEditor:
                  bg=self.colors['error'], fg=self.colors['button_fg'],
                  font=("Arial", 10)).pack(fill=tk.X, pady=2)
 
+        # Help section with proper title
+        help_frame = tk.LabelFrame(frame, text="Instructions", padx=10, pady=10,
+                                  bg=self.colors['secondary'], fg=self.colors['fg'],
+                                  highlightbackground=self.colors['border'])
+        help_frame.pack(fill=tk.X, pady=10)
+        
         help_text = """How to create edges:
 1. Select edge type above
-2. Click start point in 3D view OR enter manually
-3. Click end point in 3D view OR enter manually
-4. For arc: click a third point ON the arc
-5. For spline: add intermediate points (click or manual)
-6. Click Create Edge"""
+2. For start/end points, either:
+   • Click points in 3D view, OR
+   • Enter coordinates manually and click "Set as Start/End"
+3. For arc: select a third point ON the arc (not center)
+4. For spline/polyLine: add intermediate points
+   (click in 3D or use "Add Intermediate" button)
+5. Click "Create Edge" when ready"""
         
-        tk.Label(frame, text=help_text, font=("Courier", 9), fg=self.colors['accent'],
-                justify=tk.LEFT, bg=self.colors['text_bg'], wraplength=350).pack(fill=tk.X, pady=10)
+        tk.Label(help_frame, text=help_text, font=("Arial", 9), 
+                fg=self.colors['fg'], justify=tk.LEFT,
+                bg=self.colors['secondary']).pack(anchor=tk.W)
 
     def _setup_manage_tab(self):
         frame = tk.Frame(self.tab_manage, bg=self.colors['secondary'])
@@ -667,7 +695,7 @@ class TabEdgeEditor:
         self.viewer.draw()
 
     def _enter_point_manually(self, point_type):
-        """FIX 1: Enter a point manually using coordinates"""
+        """Enter a point manually using coordinates"""
         try:
             x = self.manual_coords[0].get()
             y = self.manual_coords[1].get()
@@ -681,7 +709,8 @@ class TabEdgeEditor:
                     self.info_label.config(text="Step 2: Select end point")
                 else:
                     self.selected_points[0] = point
-                    self.status_label.config(text=f"Start: ({x:.2f}, {y:.2f}, {z:.2f})\nSelect end point")
+                    self.status_label.config(text=f"Start: ({x:.2f}, {y:.2f}, {z:.2f})\n" + 
+                                           (f"End: set" if len(self.selected_points) > 1 else "Select end point"))
             elif point_type == 'end':
                 if len(self.selected_points) == 1:
                     self.selected_points.append(point)
@@ -700,11 +729,12 @@ class TabEdgeEditor:
                     self.status_label.config(text=f"Start: set\nEnd: ({x:.2f}, {y:.2f}, {z:.2f})\nReady to create")
             
             self.viewer.draw()
+            messagebox.showinfo("Point Set", f"Point set to ({x:.2f}, {y:.2f}, {z:.2f})")
         except Exception as e:
             messagebox.showerror("Error", f"Invalid coordinates: {e}")
 
     def _add_manual_point(self):
-        """FIX 1: Add a manual point to spline/intermediate points"""
+        """Add a manual point to spline/intermediate points"""
         try:
             x = self.manual_coords[0].get()
             y = self.manual_coords[1].get()
@@ -714,6 +744,7 @@ class TabEdgeEditor:
             self.spline_points.append(point)
             self._update_spline_listbox()
             self.viewer.draw()
+            messagebox.showinfo("Point Added", f"Intermediate point added: ({x:.2f}, {y:.2f}, {z:.2f})")
         except Exception as e:
             messagebox.showerror("Error", f"Invalid coordinates: {e}")
 

@@ -1,10 +1,11 @@
 """
 2D Editor Tab - Points & Connections
-UPDATED: Global point numbering and click-to-toggle layer selection
+UPDATED: Global point numbering, click-to-toggle layer selection, and dual view connections
 """
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 import math
+from tab2_2DEditor.DualViewConnectionHandler import DualViewConnectionHandler
 
 
 class Tab2DEditor:
@@ -60,13 +61,15 @@ class Tab2DEditor:
             'delete_bg': '#f44747'
         }
         
+        # Dual view connection handler - INITIALIZE BEFORE setup_ui
+        self.dual_handler = DualViewConnectionHandler(self)
+        
         self.setup_ui()
         
     from tab2_2DEditor.tab2_UI import setup_ui
     
     def setup_canvas_bindings(self, canvas):
         """Setup mouse bindings for a canvas"""
-        canvas.bind("<Button-1>", self.on_canvas_click)
         canvas.bind("<Button-3>", self.on_pan_start)
         canvas.bind("<B3-Motion>", self.on_pan_motion)
         canvas.bind("<ButtonRelease-3>", self.on_pan_end)
@@ -258,6 +261,13 @@ class Tab2DEditor:
                   activebackground='#d63636',
                   activeforeground=self.colors['button_fg']).pack(side=tk.LEFT, padx=1)
         
+        layer_btn_frame2 = tk.Frame(layer_frame, bg=self.colors['secondary'])
+        layer_btn_frame2.pack(fill=tk.X, pady=(5, 0))
+        tk.Button(layer_btn_frame2, text="Edit Z", command=self.edit_layer_z, width=6,
+                  bg=self.colors['button_bg'], fg=self.colors['button_fg'],
+                  activebackground=self.colors['button_active'],
+                  activeforeground=self.colors['button_fg']).pack(side=tk.LEFT, padx=1)
+        
         self.layer_info = tk.Label(layer_frame, text=f"Current: {self.mesh_data.current_layer}", 
                                    font=("Arial", 9, "bold"), fg=self.colors['success'],
                                    bg=self.colors['secondary'])
@@ -350,6 +360,45 @@ class Tab2DEditor:
                  command=self.clear_selection, bg=self.colors['button_bg'],
                  fg=self.colors['button_fg'], activebackground=self.colors['button_active'],
                  activeforeground=self.colors['button_fg']).pack(fill=tk.X, pady=2)
+        
+        # Dual View Connection Section (NEW)
+        dual_conn_frame = tk.LabelFrame(conn_frame, text="Dual View Connections", 
+                                  padx=10, pady=10,
+                                  bg=self.colors['secondary'], fg=self.colors['fg'],
+                                  highlightbackground=self.colors['border'])
+        dual_conn_frame.pack(fill=tk.X, pady=10)
+        
+        tk.Label(dual_conn_frame, text="Connect points between layers:", 
+                font=("Arial", 9), bg=self.colors['secondary'],
+                fg=self.colors['fg']).pack(anchor=tk.W, pady=(0, 5))
+        
+        self.dual_selection_label = tk.Label(dual_conn_frame, 
+                                             text="Left: None | Right: None",
+                                             font=("Arial", 9, "bold"),
+                                             fg=self.colors['warning'],
+                                             bg=self.colors['secondary'])
+        self.dual_selection_label.pack(pady=5)
+        
+        btn_frame = tk.Frame(dual_conn_frame, bg=self.colors['secondary'])
+        btn_frame.pack(fill=tk.X, pady=5)
+        
+        self.dual_connect_button = tk.Button(btn_frame, text="Make Connection", 
+                                             command=self.dual_handler.create_dual_connection,
+                                             bg=self.colors['button_bg'],
+                                             fg=self.colors['button_fg'],
+                                             font=("Arial", 10, "bold"),
+                                             state=tk.DISABLED)
+        self.dual_connect_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        
+        tk.Button(btn_frame, text="Clear", 
+                 command=self.dual_handler.clear_dual_selection,
+                 bg=self.colors['error'], fg=self.colors['button_fg'],
+                 font=("Arial", 9)).pack(side=tk.LEFT, fill=tk.X, padx=2)
+        
+        tk.Label(dual_conn_frame, 
+                text="Click one point on left canvas,\nthen one point on right canvas",
+                font=("Arial", 8, "italic"), fg=self.colors['fg'],
+                bg=self.colors['secondary']).pack(pady=(5, 0))
     
     def set_mode(self, mode):
         self.mode = mode
@@ -378,7 +427,7 @@ class Tab2DEditor:
         if self.dual_view_mode:
             if len(self.dual_view_layers) == 2:
                 self.setup_dual_view_canvases()
-                self.fit_all_view()  # <-- ADD THIS LINE to set initial dual offsets
+                self.fit_all_view()
                 self.dual_label.config(text=f"Dual View Active: {self.dual_view_layers[0]} | {self.dual_view_layers[1]}", 
                                       fg=self.colors['success'])
             else:
@@ -399,6 +448,7 @@ class Tab2DEditor:
                                width=self.canvas_width, height=self.canvas_height,
                                highlightthickness=1, highlightbackground=self.colors['border'])
         self.canvas.pack(fill=tk.BOTH, expand=True)
+        self.canvas.bind("<Button-1>", self.on_canvas_click)
         self.setup_canvas_bindings(self.canvas)
         
         self.canvas_left = None
@@ -424,6 +474,7 @@ class Tab2DEditor:
                                      width=self.canvas_width//2, height=self.canvas_height,
                                      highlightthickness=1, highlightbackground=self.colors['border'])
         self.canvas_left.pack(fill=tk.BOTH, expand=True)
+        # Bind click FIRST, then setup other bindings
         self.canvas_left.bind("<Button-1>", lambda e: self.on_dual_click(e, 0))
         self.setup_canvas_bindings(self.canvas_left)
         
@@ -439,6 +490,7 @@ class Tab2DEditor:
                                       width=self.canvas_width//2, height=self.canvas_height,
                                       highlightthickness=1, highlightbackground=self.colors['border'])
         self.canvas_right.pack(fill=tk.BOTH, expand=True)
+        # Bind click FIRST, then setup other bindings
         self.canvas_right.bind("<Button-1>", lambda e: self.on_dual_click(e, 1))
         self.setup_canvas_bindings(self.canvas_right)
         
@@ -579,60 +631,12 @@ class Tab2DEditor:
         self.update_plot()
     
     def on_dual_click(self, event, canvas_idx):
+        """Handle click in dual view - delegates to dual_handler"""
         if not self.dual_view_mode or len(self.dual_view_layers) != 2 or self.panning:
             return
         
-        canvas_widget = self.canvas_left if canvas_idx == 0 else self.canvas_right
-        layer = self.dual_view_layers[canvas_idx]
-        
-        x, y = self.canvas_to_world(event.x, event.y, canvas_widget)
-        points = self.mesh_data.points[layer]
-        
-        # Find clicked point
-        clicked_idx = None
-        for idx, (px, py) in enumerate(points):
-            dist = math.sqrt((px - x)**2 + (py - y)**2)
-            if dist < 0.3:
-                clicked_idx = idx
-                break
-        
-        if self.mode == "delete":
-            if clicked_idx is not None:
-                self.mesh_data.remove_point(layer, clicked_idx)
-                self.clear_selection()
-        elif self.mode == "add":
-            if clicked_idx is None:
-                self.mesh_data.add_point(layer, x, y)
-        elif self.mode == "connect":
-            if clicked_idx is not None:
-                # Convert to global index
-                global_idx = self.mesh_data.get_global_point_index(layer, clicked_idx)
-                
-                if global_idx not in self.selected_points:
-                    self.selected_points.append(global_idx)
-                    
-                    if len(self.selected_points) == 2:
-                        layer1, idx1 = self.mesh_data.get_layer_from_global_index(self.selected_points[0])
-                        layer2, idx2 = self.mesh_data.get_layer_from_global_index(self.selected_points[1])
-                        
-                        if layer1 == layer2:
-                            self.mesh_data.add_connection(layer1, idx1, idx2)
-                        else:
-                            self.mesh_data.add_inter_layer_connection(layer1, idx1, layer2, idx2)
-                        
-                        self.selected_points = []
-                    
-                    self.selection_label.config(text=f"Selected: {self.selected_points}")
-        elif self.mode == "select":
-            if clicked_idx is not None:
-                global_idx = self.mesh_data.get_global_point_index(layer, clicked_idx)
-                if global_idx not in self.selected_points:
-                    self.selected_points.append(global_idx)
-                    if len(self.selected_points) > 2:
-                        self.selected_points.pop(0)
-                self.selection_label.config(text=f"Selected: {self.selected_points}")
-        
-        self.update_plot()
+        # Let the dual handler manage point selection
+        self.dual_handler.handle_dual_canvas_click(event, canvas_idx)
     
     def update_plot(self):
         if self.dual_view_mode and len(self.dual_view_layers) == 2:
@@ -673,7 +677,6 @@ class Tab2DEditor:
             
             self.canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
                                    fill=color, outline=self.colors['fg'], width=2)
-            # UPDATED: Show global index with dark theme colors
             self.canvas.create_text(cx, cy-15, text=str(global_idx), 
                                    font=("Arial", 9, "bold"),
                                    fill=self.colors['fg'])
@@ -713,7 +716,6 @@ class Tab2DEditor:
             
             self.canvas_left.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
                                         fill=color, outline=self.colors['fg'], width=2)
-            # UPDATED: Show global index with dark theme colors
             self.canvas_left.create_text(cx, cy-15, text=str(global_idx), 
                                         font=("Arial", 9, "bold"),
                                         fill=self.colors['fg'])
@@ -743,10 +745,17 @@ class Tab2DEditor:
             
             self.canvas_right.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
                                          fill=color, outline=self.colors['fg'], width=2)
-            # UPDATED: Show global index with dark theme colors
             self.canvas_right.create_text(cx, cy-15, text=str(global_idx), 
                                          font=("Arial", 9, "bold"),
                                          fill=self.colors['fg'])
+        
+        # Clean up old selection markers and draw new ones
+        self.canvas_left.delete('dual_selection')
+        self.canvas_right.delete('dual_selection')
+        
+        # Draw dual view selection markers (yellow circles and crosshairs)
+        if hasattr(self, 'dual_handler'):
+            self.dual_handler.draw_dual_selection_markers()
     
     def draw_grid(self, canvas):
         width = canvas.winfo_width() or (self.canvas_width if canvas == self.canvas else self.canvas_width // 2)
@@ -791,4 +800,4 @@ class Tab2DEditor:
 
     from tab2_2DEditor.tab2_layerOps import (update_layer_list, on_layer_select,
                                      add_layer, duplicate_layer, remove_layer,
-                                     extrude_layer)
+                                     extrude_layer, edit_layer_z)

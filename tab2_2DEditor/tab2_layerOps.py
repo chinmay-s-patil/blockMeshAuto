@@ -89,3 +89,27 @@ def remove_layer(self):
     self.update_layer_list()
     self.update_dual_view_buttons()
     self.update_plot()
+    
+def edit_layer_z(self):
+    """Edit the Z value of the currently selected layer"""
+    current = self.mesh_data.current_layer
+    if not current:
+        messagebox.showwarning("Warning", "No layer selected")
+        return
+    
+    current_z = self.mesh_data.layers[current]
+    
+    z = simpledialog.askfloat("Edit Z Value", 
+                              f"New Z-value for '{current}':", 
+                              initialvalue=current_z)
+    if z is None:
+        return  # User cancelled
+    
+    # Update the layer's Z value
+    self.mesh_data.layers[current] = z
+    
+    # Update UI
+    self.update_layer_list()
+    self.update_dual_view_buttons()
+    
+    messagebox.showinfo("Success", f"Layer '{current}' Z-value updated to {z}")

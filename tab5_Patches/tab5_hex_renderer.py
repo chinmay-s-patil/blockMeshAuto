@@ -1,7 +1,6 @@
 """
 Hex Block 3D Renderer with Internal Face Detection
-Renders hex blocks and hides internal faces (faces shared between blocks)
-Similar to OpenFOAM blockMesh behavior
+FIXED: Memory leak from event bindings
 """
 import tkinter as tk
 import numpy as np
@@ -42,12 +41,19 @@ class HexBlockRenderer:
         self.pan_y = 0
         
         # Face data
-        self.all_faces = []  # List of all visible faces with metadata
+        self.all_faces = []
         self.selected_faces = set()
         self.hovered_face = None
         
         # Cache
-        self._face_cache = None
+        self._face_cache_valid = False
+        
+        # FIX: Single canvas binding instead of per-face bindings
+        self.canvas.bind("<Button-1>", self._on_canvas_click)
+        self.canvas.bind("<Motion>", self._on_canvas_motion)
+        
+        # Store polygon IDs mapped to face IDs
+        self._polygon_to_face = {}
         
     def _get_3d_coords_standard(self, global_idx):
         """Get 3D coordinates in standard (X, Y, Z) format"""
@@ -60,27 +66,27 @@ class HexBlockRenderer:
         return np.array([x, y, z])
     
     def _build_faces(self):
-        """
-        Build all faces from hex blocks and determine visibility.
-        Internal faces (shared between blocks) are marked as hidden.
-        """
+        """Build all faces from hex blocks and determine visibility"""
+        if self._face_cache_valid:
+            return
+            
         self.all_faces = []
         
         if not hasattr(self.mesh_data, 'hex_blocks') or not self.mesh_data.hex_blocks:
+            self._face_cache_valid = True
             return
         
-        # Face definitions for a hex block (vertex indices for each face)
-        # OpenFOAM vertex order: 0-1-2-3 bottom, 4-5-6-7 top
+        # Face definitions for a hex block
         face_definitions = [
-            ("bottom", [0, 3, 2, 1]),  # z-min
-            ("top", [4, 5, 6, 7]),     # z-max
-            ("front", [0, 1, 5, 4]),   # y-min
-            ("back", [2, 3, 7, 6]),    # y-max
-            ("left", [0, 4, 7, 3]),    # x-min
-            ("right", [1, 2, 6, 5])    # x-max
+            ("bottom", [0, 3, 2, 1]),
+            ("top", [4, 5, 6, 7]),
+            ("front", [0, 1, 5, 4]),
+            ("back", [2, 3, 7, 6]),
+            ("left", [0, 4, 7, 3]),
+            ("right", [1, 2, 6, 5])
         ]
         
-        # Collect all faces with their vertex coordinates
+        # Collect all faces
         face_list = []
         
         for block_idx, block in enumerate(self.mesh_data.hex_blocks):
@@ -91,12 +97,9 @@ class HexBlockRenderer:
                 continue
             
             for face_name, face_indices in face_definitions:
-                # Get vertex coordinates for this face
                 face_verts = [vertices[i] for i in face_indices]
                 face_global_indices = [point_refs[i] for i in face_indices]
                 
-                # Create a unique key for this face based on vertex global indices
-                # Sort to handle different winding orders
                 face_key = tuple(sorted(face_global_indices))
                 
                 face_list.append({
@@ -108,14 +111,13 @@ class HexBlockRenderer:
                     'face_id': len(face_list)
                 })
         
-        # Determine face visibility
-        # A face is internal if it appears exactly twice (shared between two blocks)
+        # Determine visibility
         face_key_counts = {}
         for face in face_list:
             key = face['face_key']
             face_key_counts[key] = face_key_counts.get(key, 0) + 1
         
-        # Build final face list with visibility
+        # Build final face list
         for face in face_list:
             key = face['face_key']
             is_internal = face_key_counts[key] > 1
@@ -130,17 +132,17 @@ class HexBlockRenderer:
                 'is_visible': not is_internal,
                 'center': np.mean(face['vertices'], axis=0)
             })
+        
+        self._face_cache_valid = True
     
     def _rotate_point(self, point):
         """Apply rotation to a 3D point"""
         x, y, z = point
         
-        # Rotate around X axis
         rad_x = math.radians(self.rotation_x)
         cos_x, sin_x = math.cos(rad_x), math.sin(rad_x)
         y, z = y * cos_x - z * sin_x, y * sin_x + z * cos_x
         
-        # Rotate around Y axis
         rad_y = math.radians(self.rotation_y)
         cos_y, sin_y = math.cos(rad_y), math.sin(rad_y)
         z, x = z * cos_y - x * sin_y, z * sin_y + x * cos_y
@@ -161,31 +163,31 @@ class HexBlockRenderer:
         return screen_x, screen_y, rotated[2]
     
     def draw(self):
-        """Draw all visible faces"""
+        """Draw all visible faces - FIXED memory leak"""
+        # FIX: Clear polygon mapping
+        self._polygon_to_face.clear()
+        
+        # FIX: Delete all canvas items (this removes the widgets but not the bindings)
         self.canvas.delete("all")
         
-        # Rebuild faces if needed
-        if self._face_cache is None:
-            self._build_faces()
-            self._face_cache = True
+        # Build faces if needed
+        self._build_faces()
         
         if not self.all_faces:
             self._draw_no_data_message()
             return
         
-        # Filter visible faces and calculate depth
+        # Filter visible faces
         visible_faces = []
         for face in self.all_faces:
             if not face['is_visible']:
                 continue
             
-            # Project all vertices
             projected = []
             for vert in face['vertices']:
                 sx, sy, sz = self._project(vert)
                 projected.append((sx, sy, sz))
             
-            # Calculate average depth for painter's algorithm
             avg_depth = sum(p[2] for p in projected) / len(projected)
             
             visible_faces.append({
@@ -194,7 +196,7 @@ class HexBlockRenderer:
                 'avg_depth': avg_depth
             })
         
-        # Sort by depth (back to front)
+        # Sort by depth
         visible_faces.sort(key=lambda f: f['avg_depth'], reverse=True)
         
         # Draw faces
@@ -202,12 +204,11 @@ class HexBlockRenderer:
             face_id = face['face_id']
             projected = face['projected']
             
-            # Create polygon points
             points = []
             for p in projected:
                 points.extend([p[0], p[1]])
             
-            # Determine color based on selection state
+            # Determine color
             if face_id in self.selected_faces:
                 fill_color = self.colors['face_selected']
                 outline_color = self.colors['selected']
@@ -221,29 +222,56 @@ class HexBlockRenderer:
                 outline_color = self.colors['face_outline']
                 outline_width = 1
             
-            # Draw the face
+            # FIX: Create polygon and map its ID to face_id
             poly_id = self.canvas.create_polygon(
                 points,
                 fill=fill_color,
                 outline=outline_color,
                 width=outline_width,
-                stipple='gray50',
-                tags=f"face_{face_id}"
+                stipple='gray50'
             )
             
-            # Store face ID for click detection
-            self.canvas.tag_bind(f"face_{face_id}", "<Button-1>", 
-                                lambda e, fid=face_id: self._on_face_click(fid))
-            self.canvas.tag_bind(f"face_{face_id}", "<Enter>", 
-                                lambda e, fid=face_id: self._on_face_enter(fid))
-            self.canvas.tag_bind(f"face_{face_id}", "<Leave>", 
-                                lambda e: self._on_face_leave())
+            # Store mapping (polygon canvas ID -> face_id)
+            self._polygon_to_face[poly_id] = face_id
         
-        # Draw wireframe overlay for block edges
+        # Draw wireframe and axes
         self._draw_wireframe()
-        
-        # Draw axes
         self._draw_axes()
+    
+    def _on_canvas_click(self, event):
+        """FIX: Single canvas click handler using find_closest"""
+        # Find which polygon was clicked
+        item = self.canvas.find_closest(event.x, event.y)[0]
+        
+        # Check if this polygon corresponds to a face
+        if item in self._polygon_to_face:
+            face_id = self._polygon_to_face[item]
+            
+            # Toggle selection
+            if face_id in self.selected_faces:
+                self.selected_faces.remove(face_id)
+            else:
+                self.selected_faces.add(face_id)
+            
+            self.draw()
+            self._notify_selection_change()
+    
+    def _on_canvas_motion(self, event):
+        """FIX: Single motion handler for hover effect"""
+        try:
+            item = self.canvas.find_closest(event.x, event.y)[0]
+            
+            if item in self._polygon_to_face:
+                new_hover = self._polygon_to_face[item]
+                if new_hover != self.hovered_face:
+                    self.hovered_face = new_hover
+                    self.draw()
+            else:
+                if self.hovered_face is not None:
+                    self.hovered_face = None
+                    self.draw()
+        except:
+            pass
     
     def _draw_wireframe(self):
         """Draw wireframe edges of blocks"""
@@ -251,9 +279,9 @@ class HexBlockRenderer:
             return
         
         edges = [
-            (0,1), (1,2), (2,3), (3,0),  # Bottom face
-            (4,5), (5,6), (6,7), (7,4),  # Top face
-            (0,4), (1,5), (2,6), (3,7)   # Vertical edges
+            (0,1), (1,2), (2,3), (3,0),
+            (4,5), (5,6), (6,7), (7,4),
+            (0,4), (1,5), (2,6), (3,7)
         ]
         
         for block in self.mesh_data.hex_blocks:
@@ -268,7 +296,6 @@ class HexBlockRenderer:
                 sx1, sy1, sz1 = self._project(p1)
                 sx2, sy2, sz2 = self._project(p2)
                 
-                # Only draw if at least one point is in front
                 if sz1 > -1000 or sz2 > -1000:
                     self.canvas.create_line(
                         sx1, sy1, sx2, sy2,
@@ -289,15 +316,12 @@ class HexBlockRenderer:
         y_vec = self._rotate_point([0, length, 0])
         z_vec = self._rotate_point([0, 0, length])
         
-        # X axis - Red
         self.canvas.create_line(center_x, center_y, 
                                center_x + x_vec[0], center_y - x_vec[1],
                                fill=self.colors['x_axis'], width=3, arrow=tk.LAST)
-        # Y axis - Green
         self.canvas.create_line(center_x, center_y, 
                                center_x + y_vec[0], center_y - y_vec[1],
                                fill=self.colors['y_axis'], width=3, arrow=tk.LAST)
-        # Z axis - Blue
         self.canvas.create_line(center_x, center_y, 
                                center_x + z_vec[0], center_y - z_vec[1],
                                fill=self.colors['z_axis'], width=3, arrow=tk.LAST)
@@ -323,30 +347,11 @@ class HexBlockRenderer:
         
         self.canvas.create_text(
             w/2, h/2,
-            text="No hex blocks to display\\n\\nCreate blocks in Tab 4 first",
+            text="No hex blocks to display\n\nCreate blocks in Tab 4 first",
             fill=self.colors['text'],
             font=('Arial', 14),
             justify=tk.CENTER
         )
-    
-    def _on_face_click(self, face_id):
-        """Handle face click"""
-        if face_id in self.selected_faces:
-            self.selected_faces.remove(face_id)
-        else:
-            self.selected_faces.add(face_id)
-        self.draw()
-        self._notify_selection_change()
-    
-    def _on_face_enter(self, face_id):
-        """Handle mouse enter on face"""
-        self.hovered_face = face_id
-        self.draw()
-    
-    def _on_face_leave(self):
-        """Handle mouse leave on face"""
-        self.hovered_face = None
-        self.draw()
     
     def _notify_selection_change(self):
         """Notify parent of selection change"""
@@ -375,7 +380,7 @@ class HexBlockRenderer:
     
     def invalidate_cache(self):
         """Invalidate face cache (call when blocks change)"""
-        self._face_cache = None
+        self._face_cache_valid = False
         self.all_faces = []
         self.selected_faces.clear()
 

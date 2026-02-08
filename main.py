@@ -1,6 +1,6 @@
 """
 OpenFOAM blockMesh Builder - Main Application
-Dark Mode Edition with Edge Editor Tab
+Dark Mode Edition with Edge Editor Tab and New Hex/Patch System
 """
 
 import os
@@ -17,7 +17,8 @@ from tab1_projectSettings.tab1_main import TabProjectSettings
 from tab2_2DEditor.tab2_main import Tab2DEditor
 from tab3_Edges.TabEdgeEditor import TabEdgeEditor
 from tab4_Hex.tab4_main import TabHexBlockMaking
-from tab5_3DPatches.tab5_main import Tab3DPatches
+# UPDATED: New tab5 with hex block rendering and patch assignment
+from tab5_Patches.tab5_main import Tab5HexPatches
 from tab6_export.tab6_main import TabExport
 
 
@@ -127,7 +128,7 @@ class MeshBuilderApp:
         # Create tab frames
         self.tab_project = tk.Frame(self.notebook, bg=self.colors['bg'])
         self.tab_2d = tk.Frame(self.notebook, bg=self.colors['bg'])
-        self.tab_edges = tk.Frame(self.notebook, bg=self.colors['bg'])  # NEW: Edge Editor
+        self.tab_edges = tk.Frame(self.notebook, bg=self.colors['bg'])
         self.tab_grid = tk.Frame(self.notebook, bg=self.colors['bg'])
         self.tab_3d = tk.Frame(self.notebook, bg=self.colors['bg'])
         self.tab_export = tk.Frame(self.notebook, bg=self.colors['bg'])
@@ -135,18 +136,20 @@ class MeshBuilderApp:
         # Add tabs to notebook
         self.notebook.add(self.tab_project, text="1. Project Settings")
         self.notebook.add(self.tab_2d, text="2. Points & Connections")
-        self.notebook.add(self.tab_edges, text="3. Edge Editor")      # NEW TAB
+        self.notebook.add(self.tab_edges, text="3. Edge Editor")
         self.notebook.add(self.tab_grid, text="4. Hex Blocks")
-        self.notebook.add(self.tab_3d, text="5. 3D View & Patches")
+        # UPDATED: Changed tab title to reflect new functionality
+        self.notebook.add(self.tab_3d, text="5. Hex View & Patches")
         self.notebook.add(self.tab_export, text="6. Export blockMeshDict")
         
     def setup_tabs(self):
         """Initialize all tab components"""
         self.project_settings = TabProjectSettings(self.tab_project, self.mesh_data)
         self.editor_2d = Tab2DEditor(self.tab_2d, self.mesh_data)
-        self.edge_editor = TabEdgeEditor(self.tab_edges, self.mesh_data)  # NEW
+        self.edge_editor = TabEdgeEditor(self.tab_edges, self.mesh_data)
         self.hex_blocks = TabHexBlockMaking(self.tab_grid, self.mesh_data)
-        self.patches_3d = Tab3DPatches(self.tab_3d, self.mesh_data)
+        # UPDATED: Use new Tab5HexPatches class
+        self.patches_3d = Tab5HexPatches(self.tab_3d, self.mesh_data)
         self.export_tab = TabExport(self.tab_export, self.mesh_data)
     
     def get_temp_filename(self):
@@ -205,7 +208,10 @@ class MeshBuilderApp:
                 
                 self.hex_blocks.refresh_layers()
                 self.hex_blocks.update_block_list()
-                self.patches_3d.update_view()
+                
+                # UPDATED: Use _refresh_view() instead of update_view()
+                self.patches_3d._refresh_view()
+                
                 self.export_tab.update_summary()
                 
                 messagebox.showinfo("Success", f"Project loaded from {filename}")
@@ -246,9 +252,6 @@ class MeshBuilderApp:
         self.edge_editor.viewer.mesh_data = self.mesh_data
         self.hex_blocks.mesh_data = self.mesh_data
         self.patches_3d.mesh_data = self.mesh_data
-        if hasattr(self.patches_3d, 'viewer_3d'):
-            self.patches_3d.viewer_3d.mesh_data = self.mesh_data
-        self.export_tab.mesh_data = self.mesh_data
         
         # Update all views
         self.project_settings.update_display()
@@ -266,9 +269,10 @@ class MeshBuilderApp:
         
         self.hex_blocks.refresh_layers()
         self.hex_blocks.update_block_list()
-        self.patches_3d.update_view()
-        if hasattr(self.patches_3d, 'clear_face_selection'):
-            self.patches_3d.clear_face_selection()
+        
+        # UPDATED: Refresh the new tab5
+        self.patches_3d._refresh_view()
+        
         self.export_tab.update_summary()
         
         messagebox.showinfo("New Project", "Started a new project")

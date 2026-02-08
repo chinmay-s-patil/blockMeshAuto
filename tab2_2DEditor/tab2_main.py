@@ -38,6 +38,28 @@ class Tab2DEditor:
         self.canvas_left = None
         self.canvas_right = None
         
+        # Dark mode colors (matching tab2_UI.py)
+        self.colors = {
+            'bg': '#1e1e1e',
+            'fg': '#d4d4d4',
+            'secondary': '#252526',
+            'accent': '#007acc',
+            'success': '#4ec9b0',
+            'warning': '#ce9178',
+            'error': '#f44747',
+            'button_bg': '#0e639c',
+            'button_fg': '#ffffff',
+            'button_active': '#1177bb',
+            'border': '#3e3e42',
+            'canvas_bg': '#1e1e1e',
+            'grid': '#3e3e42',
+            'axis': '#6e6e6e',
+            'select_bg': '#0e639c',
+            'add_bg': '#4ec9b0',
+            'connect_bg': '#ce9178',
+            'delete_bg': '#f44747'
+        }
+        
         self.setup_ui()
         
     from tab2_2DEditor.tab2_UI import setup_ui
@@ -159,128 +181,196 @@ class Tab2DEditor:
         self.update_plot()
         
     def _setup_mode_controls(self, parent):
-        mode_frame = tk.LabelFrame(parent, text="Mode", padx=10, pady=10)
+        mode_frame = tk.LabelFrame(parent, text="Mode", padx=10, pady=10,
+                                   bg=self.colors['secondary'], fg=self.colors['fg'],
+                                   highlightbackground=self.colors['border'],
+                                   highlightcolor=self.colors['accent'])
         mode_frame.pack(fill=tk.X, padx=5, pady=5)
         
         self.select_btn = tk.Button(mode_frame, text="Select", 
                                      command=lambda: self.set_mode("select"), 
-                                     relief=tk.SUNKEN, bg="lightblue")
+                                     relief=tk.SUNKEN, bg=self.colors['select_bg'],
+                                     fg=self.colors['button_fg'], font=("Arial", 9, "bold"),
+                                     activebackground=self.colors['button_active'],
+                                     activeforeground=self.colors['button_fg'])
         self.select_btn.pack(fill=tk.X, pady=2)
         
         self.add_btn = tk.Button(mode_frame, text="Add Points", 
-                                 command=lambda: self.set_mode("add"))
+                                 command=lambda: self.set_mode("add"),
+                                 bg=self.colors['secondary'], fg=self.colors['fg'],
+                                 activebackground=self.colors['add_bg'],
+                                 activeforeground=self.colors['button_fg'])
         self.add_btn.pack(fill=tk.X, pady=2)
         
         self.connect_btn = tk.Button(mode_frame, text="Connect", 
-                                     command=lambda: self.set_mode("connect"))
+                                     command=lambda: self.set_mode("connect"),
+                                     bg=self.colors['secondary'], fg=self.colors['fg'],
+                                     activebackground=self.colors['connect_bg'],
+                                     activeforeground=self.colors['button_fg'])
         self.connect_btn.pack(fill=tk.X, pady=2)
         
         self.delete_btn = tk.Button(mode_frame, text="Delete Points", 
-                                    command=lambda: self.set_mode("delete"))
+                                    command=lambda: self.set_mode("delete"),
+                                    bg=self.colors['secondary'], fg=self.colors['fg'],
+                                    activebackground=self.colors['delete_bg'],
+                                    activeforeground=self.colors['button_fg'])
         self.delete_btn.pack(fill=tk.X, pady=2)
         
         self.mode_label = tk.Label(mode_frame, text="Current Mode: Select", 
-                                   font=("Arial", 10, "bold"), fg="blue")
+                                   font=("Arial", 10, "bold"), fg=self.colors['accent'],
+                                   bg=self.colors['secondary'])
         self.mode_label.pack(pady=5)
         
     def _setup_layer_controls(self, parent):
-        layer_frame = tk.LabelFrame(parent, text="Layers (Z-values)", padx=10, pady=10)
+        layer_frame = tk.LabelFrame(parent, text="Layers (Z-values)", padx=10, pady=10,
+                                    bg=self.colors['secondary'], fg=self.colors['fg'],
+                                    highlightbackground=self.colors['border'],
+                                    highlightcolor=self.colors['accent'])
         layer_frame.pack(fill=tk.BOTH, padx=5, pady=5)
         
-        self.layer_listbox = tk.Listbox(layer_frame, height=6, selectmode=tk.SINGLE)
+        self.layer_listbox = tk.Listbox(layer_frame, height=6, selectmode=tk.SINGLE,
+                                        bg=self.colors['bg'], fg=self.colors['fg'],
+                                        selectbackground=self.colors['accent'],
+                                        selectforeground=self.colors['button_fg'],
+                                        highlightbackground=self.colors['border'],
+                                        font=("Arial", 9))
         self.layer_listbox.pack(fill=tk.BOTH, expand=True)
         self.layer_listbox.bind('<<ListboxSelect>>', self.on_layer_select)
         self.update_layer_list()
         
-        layer_btn_frame = tk.Frame(layer_frame)
+        layer_btn_frame = tk.Frame(layer_frame, bg=self.colors['secondary'])
         layer_btn_frame.pack(fill=tk.X, pady=(5, 0))
         
-        tk.Button(layer_btn_frame, text="Add", command=self.add_layer, width=5).pack(side=tk.LEFT, padx=1)
-        tk.Button(layer_btn_frame, text="Duplicate", command=self.duplicate_layer, width=7).pack(side=tk.LEFT, padx=1)
-        tk.Button(layer_btn_frame, text="Extrude", command=self.extrude_layer, width=6).pack(side=tk.LEFT, padx=1)
-        tk.Button(layer_btn_frame, text="Remove", command=self.remove_layer, width=6).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Add", command=self.add_layer, width=5,
+                  bg=self.colors['button_bg'], fg=self.colors['button_fg'],
+                  activebackground=self.colors['button_active'],
+                  activeforeground=self.colors['button_fg']).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Duplicate", command=self.duplicate_layer, width=7,
+                  bg=self.colors['button_bg'], fg=self.colors['button_fg'],
+                  activebackground=self.colors['button_active'],
+                  activeforeground=self.colors['button_fg']).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Extrude", command=self.extrude_layer, width=6,
+                  bg=self.colors['button_bg'], fg=self.colors['button_fg'],
+                  activebackground=self.colors['button_active'],
+                  activeforeground=self.colors['button_fg']).pack(side=tk.LEFT, padx=1)
+        tk.Button(layer_btn_frame, text="Remove", command=self.remove_layer, width=6,
+                  bg=self.colors['error'], fg=self.colors['button_fg'],
+                  activebackground='#d63636',
+                  activeforeground=self.colors['button_fg']).pack(side=tk.LEFT, padx=1)
         
         self.layer_info = tk.Label(layer_frame, text=f"Current: {self.mesh_data.current_layer}", 
-                                   font=("Arial", 9, "bold"), fg="blue")
+                                   font=("Arial", 9, "bold"), fg=self.colors['success'],
+                                   bg=self.colors['secondary'])
         self.layer_info.pack(pady=5)
         
         # Dual View Mode - UPDATED: Click to toggle instead of checkboxes
-        dual_frame = tk.LabelFrame(layer_frame, text="Dual View - Link 2 Layers", padx=10, pady=10)
+        dual_frame = tk.LabelFrame(layer_frame, text="Dual View - Link 2 Layers", padx=10, pady=10,
+                                   bg=self.colors['secondary'], fg=self.colors['fg'],
+                                   highlightbackground=self.colors['border'],
+                                   highlightcolor=self.colors['accent'])
         dual_frame.pack(fill=tk.X, pady=5)
         
         tk.Checkbutton(dual_frame, text="Enable Dual View (Side-by-Side)", 
                       variable=self.dual_view_var, command=self.toggle_dual_view,
-                      font=("Arial", 9, "bold")).pack(anchor=tk.W)
+                      font=("Arial", 9, "bold"), bg=self.colors['secondary'],
+                      fg=self.colors['fg'], selectcolor=self.colors['bg'],
+                      activebackground=self.colors['secondary'],
+                      activeforeground=self.colors['accent']).pack(anchor=tk.W)
         
         tk.Label(dual_frame, text="Click layers below to select (2 max):", 
-                font=("Arial", 8)).pack(anchor=tk.W, pady=(5,2))
+                font=("Arial", 8), bg=self.colors['secondary'],
+                fg=self.colors['fg']).pack(anchor=tk.W, pady=(5,2))
         
-        dual_canvas_frame = tk.Frame(dual_frame, height=100)
+        dual_canvas_frame = tk.Frame(dual_frame, height=100, bg=self.colors['secondary'])
         dual_canvas_frame.pack(fill=tk.BOTH)
         dual_canvas_frame.pack_propagate(False)
         
-        self.dual_buttons_frame = tk.Frame(dual_canvas_frame)
+        self.dual_buttons_frame = tk.Frame(dual_canvas_frame, bg=self.colors['secondary'])
         self.dual_buttons_frame.pack(fill=tk.BOTH)
         
         self.update_dual_view_buttons()
         
         self.dual_label = tk.Label(dual_frame, text="Select exactly 2 layers", 
-                                 font=("Arial", 8, "italic"), fg="gray")
+                                 font=("Arial", 8, "italic"), fg=self.colors['axis'],
+                                 bg=self.colors['secondary'])
         self.dual_label.pack(pady=2)
         
     def _setup_manual_entry(self, parent):
-        manual_frame = tk.LabelFrame(parent, text="Manual Entry", padx=10, pady=10)
+        manual_frame = tk.LabelFrame(parent, text="Manual Entry", padx=10, pady=10,
+                                     bg=self.colors['secondary'], fg=self.colors['fg'],
+                                     highlightbackground=self.colors['border'],
+                                     highlightcolor=self.colors['accent'])
         manual_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        entry_grid = tk.Frame(manual_frame)
+        entry_grid = tk.Frame(manual_frame, bg=self.colors['secondary'])
         entry_grid.pack()
         
-        tk.Label(entry_grid, text="X:").grid(row=0, column=0)
-        self.x_entry = tk.Entry(entry_grid, width=8)
+        tk.Label(entry_grid, text="X:", bg=self.colors['secondary'],
+                fg=self.colors['fg']).grid(row=0, column=0)
+        self.x_entry = tk.Entry(entry_grid, width=8, bg=self.colors['bg'],
+                               fg=self.colors['fg'], insertbackground=self.colors['fg'],
+                               highlightbackground=self.colors['border'])
         self.x_entry.grid(row=0, column=1, padx=2)
         self.x_entry.bind("<FocusIn>", lambda e: e.widget.select_range(0, tk.END))
         self.x_entry.bind("<Button-1>", lambda e: e.widget.select_range(0, tk.END))
         
-        tk.Label(entry_grid, text="Y:").grid(row=0, column=2)
-        self.y_entry = tk.Entry(entry_grid, width=8)
+        tk.Label(entry_grid, text="Y:", bg=self.colors['secondary'],
+                fg=self.colors['fg']).grid(row=0, column=2)
+        self.y_entry = tk.Entry(entry_grid, width=8, bg=self.colors['bg'],
+                               fg=self.colors['fg'], insertbackground=self.colors['fg'],
+                               highlightbackground=self.colors['border'])
         self.y_entry.grid(row=0, column=3, padx=2)
         self.y_entry.bind("<FocusIn>", lambda e: e.widget.select_range(0, tk.END))
         self.y_entry.bind("<Button-1>", lambda e: e.widget.select_range(0, tk.END))
         
-        tk.Button(manual_frame, text="Add Point", command=self.add_point_manual).pack(pady=5)
+        tk.Button(manual_frame, text="Add Point", command=self.add_point_manual,
+                  bg=self.colors['success'], fg=self.colors['bg'],
+                  activebackground='#3db89f',
+                  activeforeground=self.colors['bg'],
+                  font=("Arial", 9, "bold")).pack(pady=5)
         
     def _setup_connection_controls(self, parent):
-        conn_frame = tk.LabelFrame(parent, text="Connection Tools", padx=10, pady=10)
+        conn_frame = tk.LabelFrame(parent, text="Connection Tools", padx=10, pady=10,
+                                   bg=self.colors['secondary'], fg=self.colors['fg'],
+                                   highlightbackground=self.colors['border'],
+                                   highlightcolor=self.colors['accent'])
         conn_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        self.selection_label = tk.Label(conn_frame, text="Selected: None", fg="green")
+        self.selection_label = tk.Label(conn_frame, text="Selected: None", 
+                                       fg=self.colors['success'],
+                                       bg=self.colors['secondary'],
+                                       font=("Arial", 9, "bold"))
         self.selection_label.pack(pady=5)
         
         tk.Button(conn_frame, text="Delete Connection", 
-                 command=self.delete_connection, bg="salmon").pack(fill=tk.X, pady=2)
+                 command=self.delete_connection, bg=self.colors['error'],
+                 fg=self.colors['button_fg'], activebackground='#d63636',
+                 activeforeground=self.colors['button_fg']).pack(fill=tk.X, pady=2)
         tk.Button(conn_frame, text="Clear Selection", 
-                 command=self.clear_selection).pack(fill=tk.X, pady=2)
+                 command=self.clear_selection, bg=self.colors['button_bg'],
+                 fg=self.colors['button_fg'], activebackground=self.colors['button_active'],
+                 activeforeground=self.colors['button_fg']).pack(fill=tk.X, pady=2)
     
     def set_mode(self, mode):
         self.mode = mode
         
-        self.select_btn.config(relief=tk.RAISED, bg="lightgray")
-        self.add_btn.config(relief=tk.RAISED, bg="lightgray")
-        self.connect_btn.config(relief=tk.RAISED, bg="lightgray")
-        self.delete_btn.config(relief=tk.RAISED, bg="lightgray")
+        self.select_btn.config(relief=tk.RAISED, bg=self.colors['secondary'])
+        self.add_btn.config(relief=tk.RAISED, bg=self.colors['secondary'])
+        self.connect_btn.config(relief=tk.RAISED, bg=self.colors['secondary'])
+        self.delete_btn.config(relief=tk.RAISED, bg=self.colors['secondary'])
         
         if mode == "select":
-            self.select_btn.config(relief=tk.SUNKEN, bg="lightblue")
-            self.mode_label.config(text="Current Mode: Select", fg="blue")
+            self.select_btn.config(relief=tk.SUNKEN, bg=self.colors['select_bg'])
+            self.mode_label.config(text="Current Mode: Select", fg=self.colors['accent'])
         elif mode == "add":
-            self.add_btn.config(relief=tk.SUNKEN, bg="lightgreen")
-            self.mode_label.config(text="Current Mode: Add", fg="green")
+            self.add_btn.config(relief=tk.SUNKEN, bg=self.colors['add_bg'])
+            self.mode_label.config(text="Current Mode: Add", fg=self.colors['success'])
         elif mode == "connect":
-            self.connect_btn.config(relief=tk.SUNKEN, bg="lightyellow")
-            self.mode_label.config(text="Current Mode: Connect (select 2 points)", fg="orange")
+            self.connect_btn.config(relief=tk.SUNKEN, bg=self.colors['connect_bg'])
+            self.mode_label.config(text="Current Mode: Connect (select 2 points)", fg=self.colors['warning'])
         elif mode == "delete":
-            self.delete_btn.config(relief=tk.SUNKEN, bg="salmon")
-            self.mode_label.config(text="Current Mode: Delete", fg="red")
+            self.delete_btn.config(relief=tk.SUNKEN, bg=self.colors['delete_bg'])
+            self.mode_label.config(text="Current Mode: Delete", fg=self.colors['error'])
     
     def toggle_dual_view(self):
         self.dual_view_mode = self.dual_view_var.get()
@@ -289,23 +379,25 @@ class Tab2DEditor:
             if len(self.dual_view_layers) == 2:
                 self.setup_dual_view_canvases()
                 self.fit_all_view()  # <-- ADD THIS LINE to set initial dual offsets
-                self.dual_label.config(text=f"Dual View Active: {self.dual_view_layers[0]} | {self.dual_view_layers[1]}", fg="green")
+                self.dual_label.config(text=f"Dual View Active: {self.dual_view_layers[0]} | {self.dual_view_layers[1]}", 
+                                      fg=self.colors['success'])
             else:
                 messagebox.showwarning("Dual View Mode", "Select exactly 2 layers first!")
                 self.dual_view_var.set(False)
                 self.dual_view_mode = False
         else:
             self.setup_normal_canvas()
-            self.dual_label.config(text="Select exactly 2 layers", fg="gray")
+            self.dual_label.config(text="Select exactly 2 layers", fg=self.colors['axis'])
     
     def setup_normal_canvas(self):
         for widget in self.canvas_container.winfo_children():
             widget.destroy()
         
-        self.canvas_label.config(text="2D View")
+        self.canvas_label.config(text="2D View", fg=self.colors['fg'])
         
-        self.canvas = tk.Canvas(self.canvas_container, bg="white",
-                               width=self.canvas_width, height=self.canvas_height)
+        self.canvas = tk.Canvas(self.canvas_container, bg=self.colors['canvas_bg'],
+                               width=self.canvas_width, height=self.canvas_height,
+                               highlightthickness=1, highlightbackground=self.colors['border'])
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.setup_canvas_bindings(self.canvas)
         
@@ -317,30 +409,35 @@ class Tab2DEditor:
         for widget in self.canvas_container.winfo_children():
             widget.destroy()
         
-        self.canvas_label.config(text=f"Dual View: {self.dual_view_layers[0]} (Left) | {self.dual_view_layers[1]} (Right)")
+        self.canvas_label.config(text=f"Dual View: {self.dual_view_layers[0]} (Left) | {self.dual_view_layers[1]} (Right)",
+                                fg=self.colors['fg'])
         
         # Left canvas
-        left_frame = tk.Frame(self.canvas_container)
+        left_frame = tk.Frame(self.canvas_container, bg=self.colors['bg'])
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2)
         
         tk.Label(left_frame, text=f"{self.dual_view_layers[0]} (Red)", 
-                font=("Arial", 10, "bold"), fg="red").pack()
+                font=("Arial", 10, "bold"), fg="#ff6b6b",
+                bg=self.colors['bg']).pack()
         
-        self.canvas_left = tk.Canvas(left_frame, bg="white",
-                                     width=self.canvas_width//2, height=self.canvas_height)
+        self.canvas_left = tk.Canvas(left_frame, bg=self.colors['canvas_bg'],
+                                     width=self.canvas_width//2, height=self.canvas_height,
+                                     highlightthickness=1, highlightbackground=self.colors['border'])
         self.canvas_left.pack(fill=tk.BOTH, expand=True)
         self.canvas_left.bind("<Button-1>", lambda e: self.on_dual_click(e, 0))
         self.setup_canvas_bindings(self.canvas_left)
         
         # Right canvas
-        right_frame = tk.Frame(self.canvas_container)
+        right_frame = tk.Frame(self.canvas_container, bg=self.colors['bg'])
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2)
         
         tk.Label(right_frame, text=f"{self.dual_view_layers[1]} (Blue)", 
-                font=("Arial", 10, "bold"), fg="blue").pack()
+                font=("Arial", 10, "bold"), fg="#4dabf7",
+                bg=self.colors['bg']).pack()
         
-        self.canvas_right = tk.Canvas(right_frame, bg="white",
-                                      width=self.canvas_width//2, height=self.canvas_height)
+        self.canvas_right = tk.Canvas(right_frame, bg=self.colors['canvas_bg'],
+                                      width=self.canvas_width//2, height=self.canvas_height,
+                                      highlightthickness=1, highlightbackground=self.colors['border'])
         self.canvas_right.pack(fill=tk.BOTH, expand=True)
         self.canvas_right.bind("<Button-1>", lambda e: self.on_dual_click(e, 1))
         self.setup_canvas_bindings(self.canvas_right)
@@ -359,10 +456,13 @@ class Tab2DEditor:
             btn = tk.Button(
                 self.dual_buttons_frame,
                 text=f"{name} (z={self.mesh_data.layers[name]})",
-                bg="lightgreen" if is_selected else "lightgray",
+                bg=self.colors['success'] if is_selected else self.colors['bg'],
+                fg=self.colors['bg'] if is_selected else self.colors['fg'],
                 relief=tk.SUNKEN if is_selected else tk.RAISED,
                 font=("Arial", 8, "bold" if is_selected else "normal"),
-                command=lambda n=name: self.toggle_layer_in_dual_view(n)
+                command=lambda n=name: self.toggle_layer_in_dual_view(n),
+                activebackground=self.colors['accent'] if is_selected else self.colors['button_active'],
+                activeforeground=self.colors['button_fg']
             )
             btn.pack(anchor=tk.W, fill=tk.X, pady=1)
     
@@ -385,17 +485,17 @@ class Tab2DEditor:
         if len(self.dual_view_layers) == 2:
             self.dual_label.config(
                 text=f"Ready: {self.dual_view_layers[0]} ↔ {self.dual_view_layers[1]}", 
-                fg="green"
+                fg=self.colors['success']
             )
             if self.dual_view_mode:
                 self.setup_dual_view_canvases()
         elif len(self.dual_view_layers) == 1:
             self.dual_label.config(
                 text=f"Selected: {self.dual_view_layers[0]} - Select 1 more", 
-                fg="orange"
+                fg=self.colors['warning']
             )
         else:
-            self.dual_label.config(text="Select exactly 2 layers", fg="gray")
+            self.dual_label.config(text="Select exactly 2 layers", fg=self.colors['axis'])
     
     def world_to_canvas(self, x, y, canvas_widget=None):
         if canvas_widget and canvas_widget in [self.canvas_left, self.canvas_right]:
@@ -557,7 +657,7 @@ class Tab2DEditor:
                 p2 = points[conn[1]]
                 cx1, cy1 = self.world_to_canvas(p1[0], p1[1], self.canvas)
                 cx2, cy2 = self.world_to_canvas(p2[0], p2[1], self.canvas)
-                self.canvas.create_line(cx1, cy1, cx2, cy2, fill="blue", width=2)
+                self.canvas.create_line(cx1, cy1, cx2, cy2, fill=self.colors['accent'], width=2)
         
         # Draw points with GLOBAL numbering
         for local_idx, (x, y) in enumerate(points):
@@ -565,17 +665,18 @@ class Tab2DEditor:
             cx, cy = self.world_to_canvas(x, y, self.canvas)
             
             if global_idx in self.selected_points:
-                color = "green"
+                color = self.colors['success']
                 radius = 8
             else:
-                color = "red"
+                color = self.colors['error']
                 radius = 5
             
             self.canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
-                                   fill=color, outline="black")
-            # UPDATED: Show global index
+                                   fill=color, outline=self.colors['fg'], width=2)
+            # UPDATED: Show global index with dark theme colors
             self.canvas.create_text(cx, cy-15, text=str(global_idx), 
-                                   font=("Arial", 9, "bold"))
+                                   font=("Arial", 9, "bold"),
+                                   fill=self.colors['fg'])
     
     def draw_dual_view(self):
         if not self.canvas_left or not self.canvas_right:
@@ -597,24 +698,25 @@ class Tab2DEditor:
                 p2 = points_left[conn[1]]
                 cx1, cy1 = self.world_to_canvas(p1[0], p1[1], self.canvas_left)
                 cx2, cy2 = self.world_to_canvas(p2[0], p2[1], self.canvas_left)
-                self.canvas_left.create_line(cx1, cy1, cx2, cy2, fill="red", width=2)
+                self.canvas_left.create_line(cx1, cy1, cx2, cy2, fill="#ff6b6b", width=2)
         
         for local_idx, (x, y) in enumerate(points_left):
             global_idx = self.mesh_data.get_global_point_index(layer_left, local_idx)
             cx, cy = self.world_to_canvas(x, y, self.canvas_left)
             
             if global_idx in self.selected_points:
-                color = "green"
+                color = self.colors['success']
                 radius = 8
             else:
-                color = "red"
+                color = "#ff6b6b"
                 radius = 5
             
             self.canvas_left.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
-                                        fill=color, outline="black", width=2)
-            # UPDATED: Show global index
+                                        fill=color, outline=self.colors['fg'], width=2)
+            # UPDATED: Show global index with dark theme colors
             self.canvas_left.create_text(cx, cy-15, text=str(global_idx), 
-                                        font=("Arial", 9, "bold"))
+                                        font=("Arial", 9, "bold"),
+                                        fill=self.colors['fg'])
         
         # Draw right layer (blue)
         layer_right = self.dual_view_layers[1]
@@ -626,24 +728,25 @@ class Tab2DEditor:
                 p2 = points_right[conn[1]]
                 cx1, cy1 = self.world_to_canvas(p1[0], p1[1], self.canvas_right)
                 cx2, cy2 = self.world_to_canvas(p2[0], p2[1], self.canvas_right)
-                self.canvas_right.create_line(cx1, cy1, cx2, cy2, fill="blue", width=2)
+                self.canvas_right.create_line(cx1, cy1, cx2, cy2, fill="#4dabf7", width=2)
         
         for local_idx, (x, y) in enumerate(points_right):
             global_idx = self.mesh_data.get_global_point_index(layer_right, local_idx)
             cx, cy = self.world_to_canvas(x, y, self.canvas_right)
             
             if global_idx in self.selected_points:
-                color = "green"
+                color = self.colors['success']
                 radius = 8
             else:
-                color = "blue"
+                color = "#4dabf7"
                 radius = 5
             
             self.canvas_right.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
-                                         fill=color, outline="black", width=2)
-            # UPDATED: Show global index
+                                         fill=color, outline=self.colors['fg'], width=2)
+            # UPDATED: Show global index with dark theme colors
             self.canvas_right.create_text(cx, cy-15, text=str(global_idx), 
-                                         font=("Arial", 9, "bold"))
+                                         font=("Arial", 9, "bold"),
+                                         fill=self.colors['fg'])
     
     def draw_grid(self, canvas):
         width = canvas.winfo_width() or (self.canvas_width if canvas == self.canvas else self.canvas_width // 2)
@@ -651,14 +754,14 @@ class Tab2DEditor:
         
         for i in range(-20, 21):
             cx, cy = self.world_to_canvas(i, 0, canvas)
-            canvas.create_line(cx, 0, cx, height, fill="lightgray", dash=(2, 2))
+            canvas.create_line(cx, 0, cx, height, fill=self.colors['grid'], dash=(2, 2))
             
             cx, cy = self.world_to_canvas(0, i, canvas)
-            canvas.create_line(0, cy, width, cy, fill="lightgray", dash=(2, 2))
+            canvas.create_line(0, cy, width, cy, fill=self.colors['grid'], dash=(2, 2))
         
         cx, cy = self.world_to_canvas(0, 0, canvas)
-        canvas.create_line(0, cy, width, cy, fill="black", width=2)
-        canvas.create_line(cx, 0, cx, height, fill="black", width=2)
+        canvas.create_line(0, cy, width, cy, fill=self.colors['axis'], width=2)
+        canvas.create_line(cx, 0, cx, height, fill=self.colors['axis'], width=2)
     
     def add_point_manual(self):
         try:

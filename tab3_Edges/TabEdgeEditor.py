@@ -384,7 +384,7 @@ class TabEdgeEditor:
             col_frame.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
             tk.Label(col_frame, text=label, bg=self.colors['secondary'], 
                     fg=self.colors['fg'], width=3).pack(side=tk.LEFT)
-            entry = tk.Entry(col_frame, textvariable=self.manual_coords[i], width=12,
+            entry = tk.Entry(col_frame, textvariable=self.manual_coords[i], width=8,
                     bg=self.colors['text_bg'], fg=self.colors['text_fg'],
                     insertbackground=self.colors['fg'])
             entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
@@ -394,11 +394,11 @@ class TabEdgeEditor:
         # Buttons for manual entry
         manual_btn_frame = tk.Frame(manual_entry_frame, bg=self.colors['secondary'])
         manual_btn_frame.pack(fill=tk.X, pady=5)
-        tk.Button(manual_btn_frame, text="Set as Start Point", 
+        tk.Button(manual_btn_frame, text="Set as Start", 
                  command=lambda: self._enter_point_manually('start'),
                  bg=self.colors['success'], fg=self.colors['bg'],
                  font=("Arial", 9, "bold")).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        tk.Button(manual_btn_frame, text="Set as End Point", 
+        tk.Button(manual_btn_frame, text="Set as End", 
                  command=lambda: self._enter_point_manually('end'),
                  bg=self.colors['error'], fg=self.colors['button_fg'],
                  font=("Arial", 9, "bold")).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)

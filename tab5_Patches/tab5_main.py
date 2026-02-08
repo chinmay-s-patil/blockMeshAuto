@@ -11,6 +11,8 @@ FIXES:
 - Fixed fit_all to properly calculate zoom
 - Axes now in bottom right corner
 - Added Patch Normals tab for editing face normals
+- Added Patch Editor for editing existing patches
+- Added Add button to add faces to existing patches without duplicates
 """
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -79,8 +81,12 @@ class Tab5HexPatches:
         # FIX: Add hide mode tracking
         self.hide_mode = False  # False = Select mode, True = Hide mode
         
-        # Reference to normals tab
+        # Reference to normals tab and patch editor
         self.normals_tab = None
+        self.patch_editor_dialog = None  # Track open patch editor
+        
+        # Track currently selected faces for Add functionality
+        self.currently_selected_faces = set()
         
         self.setup_ui()
 
@@ -220,11 +226,13 @@ class Tab5HexPatches:
         # Status section (in patches tab)
         self._setup_status_section(self.tab_patches)
         
-        # Patch list panel (in patches tab)
+        # Patch list panel (in patches tab) - UPDATED with add callback
         from tab5_Patches.tab5_patch_panels import PatchListPanel
         self.patch_list_panel = PatchListPanel(
             self.tab_patches, self.mesh_data, self.colors,
-            on_select_callback=self._on_patch_selected
+            on_select_callback=self._on_patch_selected,
+            on_edit_callback=self._on_patch_edit,
+            on_add_callback=self._on_patch_add  # NEW: Add callback
         )
         
         # Patch assignment panel (in assign tab)
@@ -253,6 +261,106 @@ class Tab5HexPatches:
         # Initialize renderer
         self._init_renderer()
         
+    # NEW: Handle Add button click - adds selected faces to existing patch
+    def _on_patch_add(self, patch_name, patch_data):
+        """Add selected faces to an existing patch (no duplicates)"""
+        # Check if there are faces selected in the 3D view
+        if not self.currently_selected_faces:
+            messagebox.showwarning("Warning", "No faces selected in 3D view.\\nClick on faces to select them first.")
+            return
+        
+        # Get current faces in the patch
+        if isinstance(patch_data, dict):
+            current_faces = set(patch_data.get('faces', []))
+        else:
+            current_faces = set(patch_data[2]) if len(patch_data) > 2 else set()
+        
+        # Calculate new faces to add (avoid duplicates)
+        new_faces = self.currently_selected_faces - current_faces
+        
+        if not new_faces:
+            messagebox.showinfo("Info", f"All selected faces are already in patch '{patch_name}'.\\nNo new faces to add.")
+            return
+        
+        # Add new faces to the patch (using set union to avoid duplicates)
+        updated_faces = current_faces | self.currently_selected_faces
+        
+        # Update the patch data
+        if isinstance(patch_data, dict):
+            patch_data['faces'] = list(updated_faces)
+        else:
+            # Convert tuple to dict if needed
+            self.mesh_data.patches[patch_name] = {
+                'name': patch_name,
+                'type': patch_data[1] if len(patch_data) > 1 else 'patch',
+                'faces': list(updated_faces),
+                'parameters': {}
+            }
+        
+        # Refresh the list
+        self.patch_list_panel.refresh_list()
+        
+        # Clear renderer selection
+        if self.renderer:
+            self.renderer.selected_faces.clear()
+            self.renderer.draw()
+        
+        # Clear tracking
+        self.currently_selected_faces.clear()
+        
+        # Update status
+        self._update_status()
+        
+        messagebox.showinfo("Success", 
+                          f"Added {len(new_faces)} new face(s) to patch '{patch_name}'\\n"
+                          f"Total faces in patch: {len(updated_faces)}")
+        
+    # Handle patch edit button click
+    def _on_patch_edit(self, patch_name, patch_data):
+        """Open the patch editor dialog"""
+        from tab5_Patches.tab5_patch_editor import open_patch_editor
+        
+        # Close any existing editor
+        if self.patch_editor_dialog:
+            try:
+                self.patch_editor_dialog.dialog.destroy()
+            except:
+                pass
+        
+        # Open new editor
+        self.patch_editor_dialog = open_patch_editor(
+            parent=self.parent,
+            mesh_data=self.mesh_data,
+            colors=self.colors,
+            patch_name=patch_name,
+            patch_data=patch_data,
+            renderer=self.renderer,
+            on_save_callback=self._on_patch_editor_save
+        )
+        
+        # Override the renderer's click handler to work with the editor
+        if self.renderer:
+            self.renderer.patch_edit_mode = True
+            
+    # Handle patch editor save
+    def _on_patch_editor_save(self):
+        """Called when patch editor saves changes"""
+        # Refresh the patch list
+        if hasattr(self, 'patch_list_panel'):
+            self.patch_list_panel.refresh_list()
+        
+        # Clear renderer selection
+        if self.renderer:
+            self.renderer.patch_edit_mode = False
+            self.renderer.selected_faces.clear()
+            self.renderer.draw()
+        
+        # Clear reference
+        self.patch_editor_dialog = None
+        
+        # Update status
+        self._update_status()
+        
     def _on_tab_changed(self, event):
         """Handle tab change in notebook"""
         current_tab = self.notebook.index(self.notebook.select())
@@ -264,8 +372,8 @@ class Tab5HexPatches:
                 self.renderer.set_patch_edit_mode(True, self.normals_tab)
                 self.normals_tab.renderer = self.renderer  # Update renderer reference
         else:
-            # Other tab selected - disable patch edit mode
-            if self.renderer:
+            # Other tab selected - disable patch edit mode (unless editor is open)
+            if self.renderer and not self.patch_editor_dialog:
                 self.renderer.set_patch_edit_mode(False)
                 
     # FIX: Add mode toggle method
@@ -386,12 +494,23 @@ class Tab5HexPatches:
         if not self.renderer:
             return
         
-        # Let renderer handle the click, but modify behavior based on mode
+        # If patch editor is open, handle face selection for editor
+        if self.patch_editor_dialog and self.renderer.patch_edit_mode:
+            item = self.canvas.find_closest(event.x, event.y)[0]
+            if item in self.renderer._polygon_to_face:
+                face_id = self.renderer._polygon_to_face[item]
+                self.patch_editor_dialog.toggle_face_selection(face_id)
+            return
+        
+        # Let renderer handle the click normally
         # The renderer's click handler will be triggered through its canvas binding
         pass
     
     def _on_face_selection_changed(self, selected_faces):
         """Handle face selection change from renderer"""
+        # Store the selected faces for Add functionality
+        self.currently_selected_faces = selected_faces.copy()
+        
         # FIX: In hide mode, hide selected faces instead of selecting them
         if self.hide_mode and self.renderer:
             # Hide the clicked faces
@@ -446,20 +565,26 @@ class Tab5HexPatches:
         if 'clear' in patch_data:
             if self.renderer:
                 self.renderer.clear_selection()
+            # Also clear our tracking
+            self.currently_selected_faces.clear()
             return
         
         # Store patch in mesh_data (now a dict)
         patch_name = patch_data['name']
         
-        # If patch exists, append faces
+        # If patch exists, append faces (avoiding duplicates)
         if patch_name in self.mesh_data.patches:
             existing = self.mesh_data.patches[patch_name]
             existing_faces = set(existing.get('faces', []))
             new_faces = set(patch_data['faces'])
+            # Use union to avoid duplicates
             existing['faces'] = list(existing_faces | new_faces)
         else:
             print(patch_name)
             self.mesh_data.patches[patch_name] = patch_data
+        
+        # Clear tracking
+        self.currently_selected_faces.clear()
         
         # Update UI
         self.patch_list_panel.refresh_list()

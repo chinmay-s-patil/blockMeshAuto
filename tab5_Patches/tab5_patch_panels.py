@@ -257,7 +257,7 @@ class PatchAssignmentPanel:
         # Check if patch exists
         if hasattr(self.mesh_data, 'patches') and patch_name in self.mesh_data.patches:
             if not messagebox.askyesno("Confirm", 
-                                      f"Patch '{patch_name}' already exists.\n"
+                                      f"Patch '{patch_name}' already exists.\\n"
                                       "Add faces to existing patch?"):
                 return
         
@@ -274,7 +274,7 @@ class PatchAssignmentPanel:
             self.on_assign_callback(patch_data)
         
         messagebox.showinfo("Success", 
-                          f"Assigned {len(self.selected_faces)} faces to patch '{patch_name}'\n"
+                          f"Assigned {len(self.selected_faces)} faces to patch '{patch_name}'\\n"
                           f"Type: {openfoam_type}")
         
     def _clear_selection(self):
@@ -288,11 +288,13 @@ class PatchAssignmentPanel:
 class PatchListPanel:
     """Panel for displaying and managing defined patches"""
     
-    def __init__(self, parent, mesh_data, colors, on_select_callback):
+    def __init__(self, parent, mesh_data, colors, on_select_callback, on_edit_callback=None, on_add_callback=None):
         self.parent = parent
         self.mesh_data = mesh_data
         self.colors = colors
         self.on_select_callback = on_select_callback
+        self.on_edit_callback = on_edit_callback  # Callback for edit button
+        self.on_add_callback = on_add_callback    # NEW: Callback for add button
         
         self.setup_ui()
         
@@ -336,23 +338,40 @@ class PatchListPanel:
                                   wraplength=350)
         self.info_label.pack(anchor=tk.W, pady=5)
         
-        # Buttons
+        # Buttons - UPDATED with Add button
         btn_frame = tk.Frame(main_frame, bg=self.colors['secondary'])
         btn_frame.pack(fill=tk.X, pady=5)
         
+        # Add button (NEW) - adds selected faces to existing patch
+        tk.Button(btn_frame, text="Add", 
+                 command=self._add_to_patch,
+                 bg=self.colors['success'], 
+                 fg=self.colors['bg'],
+                 activebackground='#3db89f').pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        
+        # Edit button
+        tk.Button(btn_frame, text="Edit", 
+                 command=self._edit_patch,
+                 bg=self.colors['accent'], 
+                 fg=self.colors['button_fg'],
+                 activebackground=self.colors['button_active']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        
         tk.Button(btn_frame, text="Delete", 
                  command=self._delete_patch,
-                 bg=self.colors['error'], fg=self.colors['button_fg'],
+                 bg=self.colors['error'], 
+                 fg=self.colors['button_fg'],
                  activebackground='#d63636').pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
         
         tk.Button(btn_frame, text="Highlight", 
                  command=self._highlight_patch,
-                 bg=self.colors['accent'], fg=self.colors['button_fg'],
+                 bg=self.colors['button_bg'], 
+                 fg=self.colors['button_fg'],
                  activebackground=self.colors['button_active']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
         
         tk.Button(btn_frame, text="Refresh", 
                  command=self.refresh_list,
-                 bg=self.colors['button_bg'], fg=self.colors['button_fg'],
+                 bg=self.colors['button_bg'], 
+                 fg=self.colors['button_fg'],
                  activebackground=self.colors['button_active']).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
         
     def refresh_list(self):
@@ -363,8 +382,13 @@ class PatchListPanel:
             return
         
         for patch_name, patch_data in self.mesh_data.patches.items():
-            num_faces = len(patch_data.get('faces', []))
-            patch_type = patch_data.get('type', 'unknown')
+            if isinstance(patch_data, dict):
+                num_faces = len(patch_data.get('faces', []))
+                patch_type = patch_data.get('type', 'unknown')
+            else:
+                # Handle tuple format
+                num_faces = len(patch_data[2]) if len(patch_data) > 2 else 0
+                patch_type = patch_data[1] if len(patch_data) > 1 else 'unknown'
             
             display_text = f"{patch_name}: {patch_type} ({num_faces} faces)"
             self.patch_listbox.insert(tk.END, display_text)
@@ -383,21 +407,66 @@ class PatchListPanel:
                 patch_data = self.mesh_data.patches[patch_name]
                 
                 # Show info
-                info = f"Name: {patch_name}\n"
-                info += f"Type: {patch_data.get('type', 'unknown')}\n"
-                info += f"Faces: {len(patch_data.get('faces', []))}"
+                info = f"Name: {patch_name}\\n"
+                if isinstance(patch_data, dict):
+                    info += f"Type: {patch_data.get('type', 'unknown')}\\n"
+                    info += f"Faces: {len(patch_data.get('faces', []))}"
+                    params = patch_data.get('parameters', {})
+                else:
+                    info += f"Type: {patch_data[1] if len(patch_data) > 1 else 'unknown'}\\n"
+                    info += f"Faces: {len(patch_data[2]) if len(patch_data) > 2 else 0}"
+                    params = {}
                 
-                params = patch_data.get('parameters', {})
                 if params:
-                    info += "\nParameters:"
+                    info += "\\nParameters:"
                     for k, v in params.items():
-                        info += f"\n  {k}: {v}"
+                        info += f"\\n  {k}: {v}"
                 
                 self.info_label.config(text=info)
                 
                 # Notify callback
                 if self.on_select_callback:
                     self.on_select_callback(patch_name, patch_data)
+    
+    def _add_to_patch(self):
+        """NEW: Add selected faces to existing patch (no duplicates)"""
+        sel = self.patch_listbox.curselection()
+        if not sel:
+            messagebox.showwarning("Warning", "Select a patch to add faces to")
+            return
+        
+        idx = sel[0]
+        if hasattr(self.mesh_data, 'patches'):
+            patch_names = list(self.mesh_data.patches.keys())
+            if idx < len(patch_names):
+                patch_name = patch_names[idx]
+                patch_data = self.mesh_data.patches[patch_name]
+                
+                # Call the add callback
+                if self.on_add_callback:
+                    self.on_add_callback(patch_name, patch_data)
+                else:
+                    messagebox.showinfo("Info", "Add functionality not configured")
+                    
+    def _edit_patch(self):
+        """Open patch editor for selected patch"""
+        sel = self.patch_listbox.curselection()
+        if not sel:
+            messagebox.showwarning("Warning", "Select a patch to edit")
+            return
+        
+        idx = sel[0]
+        if hasattr(self.mesh_data, 'patches'):
+            patch_names = list(self.mesh_data.patches.keys())
+            if idx < len(patch_names):
+                patch_name = patch_names[idx]
+                patch_data = self.mesh_data.patches[patch_name]
+                
+                # Call the edit callback
+                if self.on_edit_callback:
+                    self.on_edit_callback(patch_name, patch_data)
+                else:
+                    messagebox.showinfo("Info", "Edit functionality not configured")
                     
     def _delete_patch(self):
         """Delete selected patch"""
@@ -428,7 +497,11 @@ class PatchListPanel:
             if idx < len(patch_names):
                 patch_name = patch_names[idx]
                 patch_data = self.mesh_data.patches[patch_name]
-                faces = patch_data.get('faces', [])
+                
+                if isinstance(patch_data, dict):
+                    faces = patch_data.get('faces', [])
+                else:
+                    faces = patch_data[2] if len(patch_data) > 2 else []
                 
                 if self.on_select_callback:
                     self.on_select_callback(patch_name, patch_data, highlight_faces=faces)

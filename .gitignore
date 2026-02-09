@@ -131,3 +131,6 @@ temp/
 mesh_temp.json
 *.json.bak
 *.json.backup
+
+#Do not ignore Examples
+!Examples/**/*.json

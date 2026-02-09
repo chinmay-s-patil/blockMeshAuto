@@ -12,9 +12,9 @@ import sys
 import numpy as np
 
 # Import the new components
-sys.path.insert(0, os.path.dirname(__file__))
-from stat_card import StatCard
-from details_panel import MeshDetailsPanel, InfoBox
+# sys.path.insert(0, os.path.dirname(__file__))
+from tab6_export.stat_card import StatCard
+from tab6_export.details_panel import MeshDetailsPanel, InfoBox
 
 
 class TabExport:

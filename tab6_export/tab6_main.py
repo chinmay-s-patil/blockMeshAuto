@@ -2,13 +2,19 @@
 Export Tab - Export to blockMeshDict format
 Redesigned with dark mode, better layout, and three tabs:
 - Actions: Export buttons and quick preview
-- Summary: Mesh statistics and cell counts
+- Summary: Mesh statistics and cell counts (IMPROVED!)
 - Details: List of patches, hexes, and edges
 """
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 import os
+import sys
 import numpy as np
+
+# Import the new components
+sys.path.insert(0, os.path.dirname(__file__))
+from stat_card import StatCard
+from details_panel import MeshDetailsPanel, InfoBox
 
 
 class TabExport:
@@ -44,9 +50,18 @@ class TabExport:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # Title
-        tk.Label(main_frame, text="Export to blockMeshDict", 
-                font=("Arial", 16, "bold"),
-                bg=self.colors['bg'], fg=self.colors['fg']).pack(pady=(0, 15))
+        title_frame = tk.Frame(main_frame, bg=self.colors['bg'])
+        title_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        tk.Label(title_frame, text="Export to blockMeshDict", 
+                font=("Segoe UI", 18, "bold"),
+                bg=self.colors['bg'], fg=self.colors['fg']).pack(side=tk.LEFT)
+        
+        # Status indicator
+        self.status_label = tk.Label(title_frame, text="● Ready", 
+                                     font=("Segoe UI", 10),
+                                     bg=self.colors['bg'], fg=self.colors['success'])
+        self.status_label.pack(side=tk.RIGHT, padx=10)
         
         # Main content area - split into left (preview) and right (tabs)
         content_frame = tk.Frame(main_frame, bg=self.colors['bg'])
@@ -56,10 +71,18 @@ class TabExport:
         left_frame = tk.Frame(content_frame, bg=self.colors['bg'])
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         
-        preview_label = tk.Label(left_frame, text="Quick Preview", 
-                                font=("Arial", 12, "bold"),
-                                bg=self.colors['bg'], fg=self.colors['accent'])
-        preview_label.pack(anchor=tk.W, pady=(0, 5))
+        preview_header = tk.Frame(left_frame, bg=self.colors['bg'])
+        preview_header.pack(fill=tk.X, pady=(0, 5))
+        
+        tk.Label(preview_header, text="📄 Quick Preview", 
+                font=("Segoe UI", 13, "bold"),
+                bg=self.colors['bg'], fg=self.colors['accent']).pack(side=tk.LEFT)
+        
+        # Line count indicator
+        self.line_count_label = tk.Label(preview_header, text="0 lines", 
+                                         font=("Segoe UI", 9),
+                                         bg=self.colors['bg'], fg=self.colors['fg'])
+        self.line_count_label.pack(side=tk.RIGHT)
         
         # Preview text with dark theme
         preview_container = tk.Frame(left_frame, bg=self.colors['border'], bd=1)
@@ -87,27 +110,33 @@ class TabExport:
         scroll_x.config(command=self.preview_text.xview)
         
         # Refresh preview button below preview
-        tk.Button(left_frame, text="Refresh Preview", 
+        btn_frame = tk.Frame(left_frame, bg=self.colors['bg'])
+        btn_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        tk.Button(btn_frame, text="🔄 Refresh Preview", 
                  command=self.update_preview,
                  bg=self.colors['button_bg'], 
                  fg=self.colors['button_fg'],
-                 font=("Arial", 9), 
+                 font=("Segoe UI", 9, "bold"), 
                  relief=tk.FLAT,
-                 activebackground=self.colors['button_active']).pack(fill=tk.X, pady=(10, 0))
+                 activebackground=self.colors['button_active'],
+                 cursor="hand2",
+                 padx=15, pady=6).pack(side=tk.LEFT)
         
         # RIGHT: Notebook with tabs
-        right_frame = tk.Frame(content_frame, bg=self.colors['bg'], width=350)
+        right_frame = tk.Frame(content_frame, bg=self.colors['bg'], width=380)
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
         right_frame.pack_propagate(False)
         
         # Create styled notebook
         style = ttk.Style()
         style.theme_use('default')
-        style.configure("TNotebook", background=self.colors['secondary'])
+        style.configure("TNotebook", background=self.colors['secondary'], borderwidth=0)
         style.configure("TNotebook.Tab", 
                        background=self.colors['secondary'],
                        foreground=self.colors['fg'],
-                       font=("Arial", 9, "bold"))
+                       font=("Segoe UI", 10, "bold"),
+                       padding=[15, 8])
         style.map("TNotebook.Tab", 
                  background=[("selected", self.colors['accent'])],
                  foreground=[("selected", self.colors['button_fg'])])
@@ -120,9 +149,9 @@ class TabExport:
         self.tab_summary = tk.Frame(self.notebook, bg=self.colors['secondary'])
         self.tab_details = tk.Frame(self.notebook, bg=self.colors['secondary'])
         
-        self.notebook.add(self.tab_actions, text="Actions")
-        self.notebook.add(self.tab_summary, text="Summary")
-        self.notebook.add(self.tab_details, text="Details")
+        self.notebook.add(self.tab_actions, text="⚡ Actions")
+        self.notebook.add(self.tab_summary, text="📊 Summary")
+        self.notebook.add(self.tab_details, text="📋 Details")
         
         # Setup each tab
         self._setup_actions_tab()
@@ -141,13 +170,13 @@ class TabExport:
         
         # Title
         tk.Label(frame, text="Export Actions", 
-                font=("Arial", 12, "bold"),
+                font=("Segoe UI", 13, "bold"),
                 bg=self.colors['secondary'], fg=self.colors['fg']).pack(anchor=tk.W, pady=(0, 15))
         
-        # Export buttons
+        # Export buttons with icons
         btn_configs = [
-            ("Export to File", self.export_blockmesh, self.colors['success'], '#3db89f'),
-            ("Copy to Clipboard", self.copy_to_clipboard, self.colors['accent'], self.colors['button_active']),
+            ("💾 Export to File", self.export_blockmesh, self.colors['success'], '#3db89f'),
+            ("📋 Copy to Clipboard", self.copy_to_clipboard, self.colors['accent'], self.colors['button_active']),
         ]
         
         for text, command, bg, active_bg in btn_configs:
@@ -155,136 +184,162 @@ class TabExport:
                            command=command,
                            bg=bg, 
                            fg=self.colors['button_fg'] if bg != self.colors['success'] else self.colors['bg'],
-                           font=("Arial", 10, "bold"), 
+                           font=("Segoe UI", 11, "bold"), 
                            relief=tk.FLAT,
                            activebackground=active_bg,
-                           height=2)
+                           cursor="hand2",
+                           padx=20,
+                           pady=12)
             btn.pack(fill=tk.X, pady=5)
         
         # Separator
-        tk.Frame(frame, bg=self.colors['border'], height=2).pack(fill=tk.X, pady=15)
+        tk.Frame(frame, bg=self.colors['border'], height=2).pack(fill=tk.X, pady=20)
         
-        # Quick info
-        tk.Label(frame, text="Mesh Info", 
-                font=("Arial", 11, "bold"),
-                bg=self.colors['secondary'], fg=self.colors['fg']).pack(anchor=tk.W, pady=(0, 10))
+        # Quick info box
+        info_box = InfoBox(frame, "Quick Stats", self.colors['accent'], self.colors)
+        info_box.pack(fill=tk.X, pady=(0, 15))
         
-        self.quick_info_label = tk.Label(frame, text="", 
-                                        font=("Courier", 10),
-                                        bg=self.colors['secondary'], 
-                                        fg=self.colors['text_fg'],
-                                        justify=tk.LEFT)
-        self.quick_info_label.pack(anchor=tk.W)
+        self.quick_info_frame = info_box.content_frame
+        self._create_quick_info_labels()
         
         # Validation warnings
         self.validation_label = tk.Label(frame, text="", 
-                                        font=("Arial", 9),
+                                        font=("Segoe UI", 9),
                                         fg=self.colors['warning'],
                                         bg=self.colors['secondary'],
                                         wraplength=300,
                                         justify=tk.LEFT)
         self.validation_label.pack(anchor=tk.W, pady=(15, 0))
         
+    def _create_quick_info_labels(self):
+        """Create the quick info labels in the info box"""
+        self.quick_info_labels = {}
+        
+        info_items = [
+            ("points", "Points", "0"),
+            ("layers", "Layers", "0"),
+            ("blocks", "Hex Blocks", "0"),
+            ("patches", "Patches", "0"),
+            ("scale", "Scale", "1.0"),
+            ("units", "Units", "m")
+        ]
+        
+        for key, label, default in info_items:
+            row = tk.Frame(self.quick_info_frame, bg=self.colors['card_bg'])
+            row.pack(fill=tk.X, pady=2)
+            
+            tk.Label(row, text=label + ":",
+                    font=('Segoe UI', 10),
+                    bg=self.colors['card_bg'],
+                    fg=self.colors['fg'],
+                    anchor=tk.W).pack(side=tk.LEFT)
+            
+            value_label = tk.Label(row, text=default,
+                                  font=('Segoe UI', 10, 'bold'),
+                                  bg=self.colors['card_bg'],
+                                  fg=self.colors['accent'],
+                                  anchor=tk.E)
+            value_label.pack(side=tk.RIGHT)
+            
+            self.quick_info_labels[key] = value_label
+    
     def _setup_summary_tab(self):
-        """Setup the Summary tab with modern dashboard-style statistics"""
-        # Main container with padding
-        main_frame = tk.Frame(self.tab_summary, bg=self.colors['secondary'], padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        """Setup the improved Summary tab with modern dashboard-style statistics"""
+        # Main scrollable container
+        main_container = tk.Frame(self.tab_summary, bg=self.colors['secondary'])
+        main_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Create canvas for scrolling
+        canvas = tk.Canvas(main_container, bg=self.colors['secondary'], highlightthickness=0)
+        scrollbar = tk.Scrollbar(main_container, orient="vertical", command=canvas.yview,
+                                bg=self.colors['secondary'])
+        
+        scrollable_frame = tk.Frame(canvas, bg=self.colors['secondary'])
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack canvas and scrollbar
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Bind mousewheel
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            return "break"
+        
+        def _on_mousewheel_linux(event):
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+            return "break"
+        
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        canvas.bind_all("<Button-4>", _on_mousewheel_linux)
+        canvas.bind_all("<Button-5>", _on_mousewheel_linux)
+        
+        # Main content frame with padding
+        content_frame = tk.Frame(scrollable_frame, bg=self.colors['secondary'])
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Header section
-        header_frame = tk.Frame(main_frame, bg=self.colors['secondary'])
+        header_frame = tk.Frame(content_frame, bg=self.colors['secondary'])
         header_frame.pack(fill=tk.X, pady=(0, 20))
         
-        tk.Label(header_frame, text="Mesh Statistics", 
+        tk.Label(header_frame, text="Mesh Statistics Dashboard", 
                 font=("Segoe UI", 18, "bold"),
                 bg=self.colors['secondary'], fg=self.colors['accent']).pack(anchor=tk.W)
         
-        tk.Label(header_frame, text="Overview of your CFD mesh configuration", 
+        tk.Label(header_frame, text="Complete overview of your CFD mesh configuration", 
                 font=("Segoe UI", 10),
                 bg=self.colors['secondary'], fg=self.colors['fg']).pack(anchor=tk.W, pady=(5, 0))
         
         # Stats cards container (2x2 grid)
-        self.cards_frame = tk.Frame(main_frame, bg=self.colors['secondary'])
-        self.cards_frame.pack(fill=tk.X, pady=(0, 20))
+        cards_container = tk.Frame(content_frame, bg=self.colors['secondary'])
+        cards_container.pack(fill=tk.X, pady=(0, 25))
         
-        # Configure grid weights
-        self.cards_frame.grid_columnconfigure(0, weight=1)
-        self.cards_frame.grid_columnconfigure(1, weight=1)
+        # Configure grid
+        cards_container.grid_columnconfigure(0, weight=1, uniform="card")
+        cards_container.grid_columnconfigure(1, weight=1, uniform="card")
         
-        # Create card placeholders (will be populated in update_summary)
-        self.stat_cards = {}
+        # Create stat cards with icons and colors
         card_configs = [
-            ("vertices", "Vertices", self.colors['accent']),
-            ("blocks", "Hex Blocks", self.colors['success']),
-            ("cells", "Total Cells", self.colors['warning']),
-            ("patches", "Patches", '#c586c0')  # Purple
+            ("vertices", "Total Vertices", "0", "●", self.colors['accent']),
+            ("blocks", "Hex Blocks", "0", "■", self.colors['success']),
+            ("cells", "Total Cells", "0", "▦", self.colors['warning']),
+            ("patches", "Boundary Patches", "0", "▨", '#c586c0')
         ]
         
-        for i, (key, label, color) in enumerate(card_configs):
+        self.stat_cards = {}
+        for i, (key, label, value, icon, color) in enumerate(card_configs):
             row, col = divmod(i, 2)
-            card = self._create_stat_card(self.cards_frame, label, "0", color)
-            card.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+            card = StatCard(cards_container, label, value, icon, color, self.colors)
+            card.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
             self.stat_cards[key] = card
         
-        # Detailed breakdown section
-        details_frame = tk.Frame(main_frame, bg=self.colors['secondary'])
-        details_frame.pack(fill=tk.BOTH, expand=True)
+        # Project info section
+        project_box = InfoBox(content_frame, "Project Configuration", self.colors['accent'], self.colors)
+        project_box.pack(fill=tk.X, pady=(0, 15))
+        self.project_info_frame = project_box.content_frame
         
-        tk.Label(details_frame, text="Detailed Breakdown", 
-                font=("Segoe UI", 12, "bold"),
-                bg=self.colors['secondary'], fg=self.colors['fg']).pack(anchor=tk.W, pady=(0, 10))
+        # Mesh details panel
+        tk.Label(content_frame, text="",
+                bg=self.colors['secondary']).pack(pady=5)
         
-        # Styled text container
-        text_container = tk.Frame(details_frame, bg=self.colors['border'], bd=1)
-        text_container.pack(fill=tk.BOTH, expand=True)
-        
-        scrollbar = tk.Scrollbar(text_container, bg=self.colors['secondary'])
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.stats_text = tk.Text(text_container, 
-                                 font=("Consolas", 10),
-                                 bg=self.colors['text_bg'],
-                                 fg=self.colors['text_fg'],
-                                 relief=tk.FLAT,
-                                 wrap=tk.WORD,
-                                 yscrollcommand=scrollbar.set,
-                                 padx=15, pady=15,
-                                 height=12)
-        self.stats_text.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-        scrollbar.config(command=self.stats_text.yview)
-        
-        # Bind mouse wheel for scrolling
-        self.stats_text.bind("<MouseWheel>", self._on_mousewheel)
-        self.stats_text.bind("<Button-4>", self._on_mousewheel_linux)
-        self.stats_text.bind("<Button-5>", self._on_mousewheel_linux)
-        
-        # Configure text tags for styling
-        self.stats_text.tag_configure("header", 
-                                     foreground=self.colors['accent'], 
-                                     font=("Consolas", 12, "bold"))
-        self.stats_text.tag_configure("subheader", 
-                                     foreground=self.colors['fg'],
-                                     font=("Consolas", 11, "bold"))
-        self.stats_text.tag_configure("label", 
-                                     foreground=self.colors['fg'],
-                                     font=("Consolas", 10))
-        self.stats_text.tag_configure("value", 
-                                     foreground=self.colors['success'], 
-                                     font=("Consolas", 10, "bold"))
-        self.stats_text.tag_configure("highlight", 
-                                     foreground=self.colors['warning'],
-                                     font=("Consolas", 11, "bold"))
-        self.stats_text.tag_configure("separator", 
-                                     foreground=self.colors['border'])
-        self.stats_text.tag_configure("dim", 
-                                     foreground='#808080',
-                                     font=("Consolas", 10))
+        self.details_panel = MeshDetailsPanel(content_frame, self.colors)
+        self.details_panel.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
         
         # Refresh button at bottom
-        btn_frame = tk.Frame(main_frame, bg=self.colors['secondary'])
-        btn_frame.pack(fill=tk.X, pady=(15, 0))
+        btn_container = tk.Frame(content_frame, bg=self.colors['secondary'])
+        btn_container.pack(fill=tk.X, pady=(10, 0))
         
-        refresh_btn = tk.Button(btn_frame, text="⟳ Refresh Statistics", 
+        refresh_btn = tk.Button(btn_container, text="⟳ Refresh All Statistics", 
                                command=self.update_summary,
                                bg=self.colors['button_bg'], 
                                fg=self.colors['button_fg'],
@@ -292,131 +347,8 @@ class TabExport:
                                relief=tk.FLAT,
                                activebackground=self.colors['button_active'],
                                cursor="hand2",
-                               padx=20, pady=8)
+                               padx=20, pady=10)
         refresh_btn.pack(side=tk.RIGHT)
-        
-    def _on_mousewheel(self, event):
-        """Handle mouse wheel scrolling on Windows/macOS"""
-        self.stats_text.yview_scroll(int(-1*(event.delta/120)), "units")
-        return "break"
-        
-    def _on_mousewheel_linux(self, event):
-        """Handle mouse wheel scrolling on Linux"""
-        if event.num == 4:
-            self.stats_text.yview_scroll(-1, "units")
-        elif event.num == 5:
-            self.stats_text.yview_scroll(1, "units")
-        return "break"
-        
-    def _create_stat_card(self, parent, label, value, color):
-        """Create a modern stat card with color accent"""
-        card = tk.Frame(parent, bg=self.colors['card_bg'], padx=20, pady=20)
-        
-        # Color indicator bar at top
-        indicator = tk.Frame(card, bg=color, height=3)
-        indicator.pack(fill=tk.X, pady=(0, 12))
-        
-        # Label
-        tk.Label(card, text=label, 
-                font=("Segoe UI", 11),
-                bg=self.colors['card_bg'], fg=self.colors['fg']).pack(anchor=tk.W)
-        
-        # Value (stored as attribute for updates)
-        value_label = tk.Label(card, text=value, 
-                              font=("Segoe UI", 28, "bold"),
-                              bg=self.colors['card_bg'], fg=color)
-        value_label.pack(anchor=tk.W, pady=(8, 0))
-        card.value_label = value_label
-        
-        return card
-        
-    def update_summary(self):
-        """Update the Summary tab with statistics - REFRESHES ALL DATA"""
-        # Calculate statistics fresh from mesh_data
-        total_cells = 0
-        block_details = []
-        
-        for i, block in enumerate(self.mesh_data.hex_blocks):
-            nx, ny, nz = block['divisions']
-            cells = nx * ny * nz
-            total_cells += cells
-            block_details.append((i, nx, ny, nz, cells))
-        
-        total_points = self.mesh_data.get_total_points()
-        total_blocks = len(self.mesh_data.hex_blocks)
-        total_patches = len(self.mesh_data.patches)
-        
-        # Update stat cards with fresh data
-        self.stat_cards['vertices'].value_label.config(text=f"{total_points:,}")
-        self.stat_cards['blocks'].value_label.config(text=str(total_blocks))
-        self.stat_cards['cells'].value_label.config(text=f"{total_cells:,}")
-        self.stat_cards['patches'].value_label.config(text=str(total_patches))
-        
-        # Update detailed text with fresh data
-        self.stats_text.config(state=tk.NORMAL)
-        self.stats_text.delete('1.0', tk.END)
-        
-        def insert_line(text="", tag=None):
-            self.stats_text.insert(tk.END, text + "\n", tag)
-        
-        # Project Configuration Section - Modern boxed style
-        insert_line("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓", "separator")
-        insert_line("┃" + " MESH CONFIGURATION".center(42) + "┃", "header")
-        insert_line("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛", "separator")
-        insert_line()
-        
-        # Two-column layout for config
-        insert_line(f"  Project Name:     {self.mesh_data.project_name}", "label")
-        self.stats_text.insert(tk.END, "\n", None)
-        insert_line(f"  Unit System:      {self.mesh_data.unit_system}", "label")
-        insert_line(f"  Scale Factor:     {self.mesh_data.get_scale_value()}", "label")
-        insert_line(f"  Total Layers:     {len(self.mesh_data.layers)}", "label")
-        insert_line()
-        
-        # Cell Distribution Section
-        insert_line("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓", "separator")
-        insert_line("┃" + " CELL DISTRIBUTION".center(42) + "┃", "subheader")
-        insert_line("┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫", "separator")
-        
-        if block_details:
-            for i, nx, ny, nz, cells in block_details:
-                insert_line(f"┃ Block {i:<2}                                 ┃", "label")
-                insert_line(f"┃   Divisions: {nx:>3} × {ny:>3} × {nz:<3}            ┃", "dim")
-                insert_line(f"┃   Cells:     {cells:>10,}                 ┃", "value")
-                if i < len(block_details) - 1:
-                    insert_line("┃                                          ┃", "separator")
-            insert_line("┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫", "separator")
-            insert_line(f"┃ TOTAL: {total_cells:>10,} cells                   ┃", "highlight")
-        else:
-            insert_line("┃ No hex blocks defined                    ┃", "dim")
-        
-        insert_line("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛", "separator")
-        insert_line()
-        
-        # Boundary Patches Section
-        insert_line("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓", "separator")
-        insert_line("┃" + " BOUNDARY PATCHES".center(42) + "┃", "subheader")
-        insert_line("┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫", "separator")
-        
-        if self.mesh_data.patches:
-            patch_items = list(self.mesh_data.patches.items())
-            for idx, (patch_name, patch_data) in enumerate(patch_items):
-                if isinstance(patch_data, dict):
-                    ptype = patch_data.get('type', 'unknown')
-                    num_faces = len(patch_data.get('faces', []))
-                else:
-                    ptype = patch_data[1] if len(patch_data) > 1 else 'unknown'
-                    num_faces = len(patch_data[2]) if len(patch_data) > 2 else 0
-                
-                insert_line(f"┃ {patch_name[:20]:<20} {ptype:<8} {num_faces:>3} faces  ┃", "value")
-                if idx < len(patch_items) - 1:
-                    insert_line("┃                                          ┃", "separator")
-        else:
-            insert_line("┃ No patches defined                       ┃", "dim")
-        
-        insert_line("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛", "separator")
-        
-        self.stats_text.config(state=tk.DISABLED)
         
     def _setup_details_tab(self):
         """Setup the Details tab with patches, hexes, edges lists"""
@@ -462,7 +394,7 @@ class TabExport:
         
         for i, header in enumerate(headers.get(list_type, ('Item', 'Info'))):
             tk.Label(header_frame, text=header, 
-                    font=("Arial", 9, "bold"),
+                    font=("Segoe UI", 9, "bold"),
                     bg=self.colors['secondary'], 
                     fg=self.colors['accent'],
                     width=15 if i == 0 else 12).pack(side=tk.LEFT)
@@ -489,21 +421,27 @@ class TabExport:
         setattr(self, f'{list_type}_listbox', listbox)
         
         # Refresh button
-        tk.Button(container, text="Refresh", 
+        tk.Button(container, text="⟳ Refresh", 
                  command=lambda: self.update_details(),
                  bg=self.colors['button_bg'], 
                  fg=self.colors['button_fg'],
-                 font=("Arial", 8), 
+                 font=("Segoe UI", 9, "bold"), 
                  relief=tk.FLAT,
-                 activebackground=self.colors['button_active']).pack(fill=tk.X, pady=(5, 0))
+                 activebackground=self.colors['button_active'],
+                 cursor="hand2",
+                 padx=15, pady=5).pack(fill=tk.X, pady=(5, 0))
         
     def update_preview(self):
-        """Update the preview text - REFRESHES IN PLACE"""
+        """Update the preview text"""
         content = self.generate_blockmesh_dict()
         self.preview_text.delete('1.0', tk.END)
         self.preview_text.insert('1.0', content)
         
-        # Also update quick info
+        # Update line count
+        line_count = content.count('\n') + 1
+        self.line_count_label.config(text=f"{line_count} lines")
+        
+        # Update quick info
         self._update_quick_info()
         self._update_validation()
         
@@ -513,71 +451,139 @@ class TabExport:
         total_layers = len(self.mesh_data.layers)
         total_hex_blocks = len(self.mesh_data.hex_blocks)
         total_patches = len(self.mesh_data.patches)
+        scale = self.mesh_data.get_scale_value()
+        units = self.mesh_data.unit_system
         
-        info_text = f"""Points:     {total_points}
-Layers:     {total_layers}
-Hex Blocks: {total_hex_blocks}
-Patches:    {total_patches}
-Scale:      {self.mesh_data.get_scale_value()}
-Units:      {self.mesh_data.unit_system}"""
-        
-        self.quick_info_label.config(text=info_text)
+        if hasattr(self, 'quick_info_labels'):
+            self.quick_info_labels['points'].config(text=str(total_points))
+            self.quick_info_labels['layers'].config(text=str(total_layers))
+            self.quick_info_labels['blocks'].config(text=str(total_hex_blocks))
+            self.quick_info_labels['patches'].config(text=str(total_patches))
+            self.quick_info_labels['scale'].config(text=str(scale))
+            self.quick_info_labels['units'].config(text=units)
         
     def _update_validation(self):
         """Update validation warnings"""
         issues = self.validate_hex_blocks()
         if issues:
             self.validation_label.config(
-                text="Warnings:\\n" + "\\n".join(f"  - {issue}" for issue in issues[:3])
+                text="⚠️ Warnings:\n" + "\n".join(f"  • {issue}" for issue in issues[:3]),
+                fg=self.colors['warning']
             )
+            self.status_label.config(text="● Warning", fg=self.colors['warning'])
         else:
-            self.validation_label.config(text="No validation issues", fg=self.colors['success'])
+            self.validation_label.config(text="✓ No validation issues", fg=self.colors['success'])
+            self.status_label.config(text="● Ready", fg=self.colors['success'])
             
     def update_summary(self):
-        """Update the Summary tab with statistics"""
-        self.stats_text.config(state=tk.NORMAL)
-        self.stats_text.delete('1.0', tk.END)
-
-        # Calculate total cells
+        """Update the Summary tab with comprehensive statistics"""
+        # Calculate statistics
         total_cells = 0
-
+        block_details = []
+        
         for i, block in enumerate(self.mesh_data.hex_blocks):
             nx, ny, nz = block['divisions']
             cells = nx * ny * nz
             total_cells += cells
-
-        # Build summary text
-        summary = []
-        summary.append("=" * 40)
-        summary.append("MESH OVERVIEW")
-        summary.append("=" * 40)
-        summary.append("")
-        summary.append(f"Total Vertices:     {self.mesh_data.get_total_points():,}")
-        summary.append(f"Total Layers:       {len(self.mesh_data.layers)}")
-        summary.append(f"Total Hex Blocks:   {len(self.mesh_data.hex_blocks)}")
-        summary.append(f"Total Patches:      {len(self.mesh_data.patches)}")
-        summary.append("")
-        summary.append("=" * 40)
-        summary.append("CELL COUNT")
-        summary.append("=" * 40)
-        summary.append("")
-
+            block_details.append((i, nx, ny, nz, cells))
+        
+        total_points = self.mesh_data.get_total_points()
+        total_blocks = len(self.mesh_data.hex_blocks)
+        total_patches = len(self.mesh_data.patches)
+        
+        # Update stat cards
+        self.stat_cards['vertices'].update_value(f"{total_points:,}")
+        self.stat_cards['blocks'].update_value(str(total_blocks))
+        self.stat_cards['cells'].update_value(f"{total_cells:,}")
+        self.stat_cards['patches'].update_value(str(total_patches))
+        
+        # Update project info
+        for widget in self.project_info_frame.winfo_children():
+            widget.destroy()
+        
+        project_items = [
+            ("Project Name", self.mesh_data.project_name),
+            ("Unit System", self.mesh_data.unit_system),
+            ("Scale Factor", f"{self.mesh_data.get_scale_value()}"),
+            ("Sketch Plane", self.mesh_data.sketch_plane),
+            ("Total Layers", str(len(self.mesh_data.layers)))
+        ]
+        
+        for label, value in project_items:
+            row = tk.Frame(self.project_info_frame, bg=self.colors['card_bg'])
+            row.pack(fill=tk.X, pady=2)
+            
+            tk.Label(row, text=label + ":",
+                    font=('Segoe UI', 10),
+                    bg=self.colors['card_bg'],
+                    fg=self.colors['fg'],
+                    anchor=tk.W).pack(side=tk.LEFT)
+            
+            tk.Label(row, text=str(value),
+                    font=('Segoe UI', 10, 'bold'),
+                    bg=self.colors['card_bg'],
+                    fg=self.colors['accent'],
+                    anchor=tk.E).pack(side=tk.RIGHT)
+        
+        # Update details panel
+        self.details_panel.clear()
+        
+        # Mesh Overview Section
+        self.details_panel.insert_section_header("MESH OVERVIEW", "📐")
+        self.details_panel.insert_key_value("Total Vertices", f"{total_points:,}")
+        self.details_panel.insert_key_value("Hex Blocks", total_blocks)
+        self.details_panel.insert_key_value("Total Cells", f"{total_cells:,}")
+        self.details_panel.insert_key_value("Boundary Patches", total_patches)
+        
+        # Cell Distribution Section
+        if block_details:
+            self.details_panel.insert_section_header("CELL DISTRIBUTION", "⚡")
+            
+            for i, nx, ny, nz, cells in block_details:
+                self.details_panel.insert_line()
+                self.details_panel.insert(f"  Block {i}", "subsection")
+                self.details_panel.insert_line()
+                self.details_panel.insert_key_value("Divisions", f"{nx} × {ny} × {nz}", indent=1)
+                self.details_panel.insert_key_value("Total Cells", f"{cells:,}", indent=1)
+                
+                # Show grading if not uniform
+                if i < len(self.mesh_data.hex_blocks):
+                    grading = self.mesh_data.hex_blocks[i].get('grading_params', {})
+                    gx = grading.get('x', 1.0)
+                    gy = grading.get('y', 1.0)
+                    gz = grading.get('z', 1.0)
+                    
+                    if gx != 1.0 or gy != 1.0 or gz != 1.0:
+                        self.details_panel.insert_key_value("Grading", f"({gx}, {gy}, {gz})", indent=1)
+        
+        # Boundary Patches Section
+        if self.mesh_data.patches:
+            self.details_panel.insert_section_header("BOUNDARY PATCHES", "🔲")
+            
+            for patch_name, patch_data in self.mesh_data.patches.items():
+                if isinstance(patch_data, dict):
+                    ptype = patch_data.get('type', 'unknown')
+                    num_faces = len(patch_data.get('faces', []))
+                else:
+                    ptype = patch_data[1] if len(patch_data) > 1 else 'unknown'
+                    num_faces = len(patch_data[2]) if len(patch_data) > 2 else 0
+                
+                self.details_panel.insert_line()
+                self.details_panel.insert(f"  {patch_name}", "subsection")
+                self.details_panel.insert_line()
+                self.details_panel.insert_key_value("Type", ptype, indent=1)
+                self.details_panel.insert_key_value("Faces", num_faces, indent=1)
+        
+        # Quality Metrics
         if total_cells > 0:
-            summary.append(f"TOTAL CELLS:        {total_cells:,}")
-        else:
-            summary.append("No hex blocks defined")
-
-        summary.append("")
-        summary.append("=" * 40)
-        summary.append("SCALE & UNITS")
-        summary.append("=" * 40)
-        summary.append("")
-        summary.append(f"Scale Factor:       {self.mesh_data.get_scale_value()}")
-        summary.append(f"Unit System:        {self.mesh_data.unit_system}")
-        summary.append(f"Project Name:       {self.mesh_data.project_name}")
-
-        self.stats_text.insert('1.0', ''.join(summary))
-        self.stats_text.config(state=tk.DISABLED)
+            self.details_panel.insert_section_header("QUALITY METRICS", "✓")
+            avg_cells_per_block = total_cells / max(1, total_blocks)
+            self.details_panel.insert_key_value("Avg Cells/Block", f"{avg_cells_per_block:.1f}")
+            
+            if total_patches > 0:
+                self.details_panel.insert_key_value("Blocks/Patch Ratio", f"{total_blocks / total_patches:.2f}")
+        
+        self.details_panel.finalize()
         
     def update_details(self):
         """Update the Details tab lists"""
@@ -590,7 +596,6 @@ Units:      {self.mesh_data.unit_system}"""
                         ptype = patch_data.get('type', 'unknown')
                         num_faces = len(patch_data.get('faces', []))
                     else:
-                        # Handle tuple format for backward compatibility
                         ptype = patch_data[1] if len(patch_data) > 1 else 'unknown'
                         num_faces = len(patch_data[2]) if len(patch_data) > 2 else 0
                     self.patches_listbox.insert(tk.END, f"{patch_name:<15} {ptype:<12} {num_faces}")
@@ -601,12 +606,11 @@ Units:      {self.mesh_data.unit_system}"""
             for i, block in enumerate(self.mesh_data.hex_blocks):
                 nx, ny, nz = block['divisions']
                 cells = nx * ny * nz
-                self.hexes_listbox.insert(tk.END, f"Block {i:<11} {nx}x{ny}x{nz:<6} {cells:,}")
+                self.hexes_listbox.insert(tk.END, f"Block {i:<11} {nx}×{ny}×{nz:<6} {cells:,}")
         
         # Update edges list
         if hasattr(self, 'edges_listbox'):
             self.edges_listbox.delete(0, tk.END)
-            # For now, show block edges as simple info
             for i, block in enumerate(self.mesh_data.hex_blocks):
                 verts = block.get('vertices', [])
                 self.edges_listbox.insert(tk.END, f"Block {i:<11} hex          {len(verts)} verts")
@@ -646,9 +650,9 @@ Units:      {self.mesh_data.unit_system}"""
         if not hasattr(self.mesh_data, 'hex_blocks') or not self.mesh_data.hex_blocks:
             return face_id_to_vertices
 
-        # Face definitions for a hex block (vertex indices for each face)
+        # Face definitions for a hex block
         face_definitions = [
-            ("bottom", [0, 3, 2, 1]),  # Note: reversed for outward normal
+            ("bottom", [0, 3, 2, 1]),
             ("top", [4, 5, 6, 7]),
             ("front", [0, 1, 5, 4]),
             ("back", [3, 7, 6, 2]),
@@ -663,7 +667,6 @@ Units:      {self.mesh_data.unit_system}"""
                 continue
 
             for face_name, face_vertex_indices in face_definitions:
-                # Get the global point indices for this face
                 face_global_indices = [point_refs[i] for i in face_vertex_indices]
                 face_id_to_vertices[face_id] = face_global_indices
                 face_id += 1
@@ -673,7 +676,7 @@ Units:      {self.mesh_data.unit_system}"""
     def generate_blockmesh_dict(self):
         """Generate the complete blockMeshDict content"""
         lines = []
-        lines.append("/*--------------------------------*- C++ -*----------------------------------*\\\\")
+        lines.append("/*--------------------------------*- C++ -*----------------------------------*\\")
         lines.append("| =========                 |                                                 |")
         lines.append("| \\\\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |")
         lines.append("|  \\\\    /   O peration     | Version:  v2012                                 |")
@@ -699,7 +702,6 @@ Units:      {self.mesh_data.unit_system}"""
         lines.append("vertices")
         lines.append("(")
         
-        # Get all points in order
         points_3d, point_map = self.mesh_data.get_all_3d_points()
         
         for i, coords in enumerate(points_3d):
@@ -709,7 +711,7 @@ Units:      {self.mesh_data.unit_system}"""
         lines.append(");")
         lines.append("")
         
-        # Blocks (hex blocks)
+        # Blocks
         lines.append("blocks")
         lines.append("(")
         
@@ -750,11 +752,9 @@ Units:      {self.mesh_data.unit_system}"""
         lines.append("boundary")
         lines.append("(")
 
-        # Build face ID to vertex indices mapping from hex blocks
         face_id_to_vertices = self._build_face_id_mapping()
 
         for patch_name, patch_data in self.mesh_data.patches.items():
-            # Handle both dict and tuple formats
             if isinstance(patch_data, dict):
                 patch_type = patch_data.get('type', 'patch')
                 face_ids = patch_data.get('faces', [])
@@ -768,13 +768,10 @@ Units:      {self.mesh_data.unit_system}"""
             lines.append("        faces")
             lines.append("        (")
 
-            # Convert face IDs to vertex indices
             for face_id in face_ids:
                 if isinstance(face_id, (list, tuple)) and len(face_id) == 4:
-                    # Already in vertex indices format (legacy)
                     lines.append(f"            ({face_id[0]} {face_id[1]} {face_id[2]} {face_id[3]})")
                 elif isinstance(face_id, int) and face_id in face_id_to_vertices:
-                    # Look up vertex indices from face ID
                     verts = face_id_to_vertices[face_id]
                     lines.append(f"            ({verts[0]} {verts[1]} {verts[2]} {verts[3]})")
 
@@ -803,9 +800,9 @@ Units:      {self.mesh_data.unit_system}"""
         issues = self.validate_hex_blocks()
         if issues:
             result = messagebox.askyesno("Validation Warning", 
-                                        "There are issues with your hex blocks:\\n\\n" + 
-                                        "\\n".join(f"- {issue}" for issue in issues) +
-                                        "\\n\\nExport anyway?")
+                                        "There are issues with your hex blocks:\n\n" + 
+                                        "\n".join(f"- {issue}" for issue in issues) +
+                                        "\n\nExport anyway?")
             if not result:
                 return
         
@@ -820,13 +817,16 @@ Units:      {self.mesh_data.unit_system}"""
                 content = self.generate_blockmesh_dict()
                 with open(filename, 'w') as f:
                     f.write(content)
-                messagebox.showinfo("Success", f"blockMeshDict exported to:\\n{filename}")
+                messagebox.showinfo("Success", f"✓ blockMeshDict exported to:\n{filename}")
+                self.status_label.config(text="● Exported", fg=self.colors['success'])
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to export: {str(e)}")
+                self.status_label.config(text="● Error", fg=self.colors['error'])
     
     def copy_to_clipboard(self):
         """Copy content to clipboard"""
         content = self.generate_blockmesh_dict()
         self.parent.clipboard_clear()
         self.parent.clipboard_append(content)
-        messagebox.showinfo("Copied", "blockMeshDict content copied to clipboard!")
+        messagebox.showinfo("Copied", "✓ blockMeshDict content copied to clipboard!")
+        self.status_label.config(text="● Copied", fg=self.colors['success'])

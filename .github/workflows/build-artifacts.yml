@@ -1,96 +1,94 @@
-name: Build Windows .exe and Linux AppImage
+name: Build Windows EXE and Linux AppImage
 
-# Runs on every push (change to tags or branches if you prefer)
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
 
 env:
-  PYTHON_VERSION: '3.11'
-  APP_NAME: 'BlockMeshAuto'
-  MAIN_SCRIPT: 'main.py'   # change if your entrypoint has a different name
+  PYTHON_VERSION: "3.11"
+  APP_NAME: "BlockMeshAuto"
+  MAIN_SCRIPT: "main.py"   # CHANGE if needed
 
 jobs:
+
   build-windows:
-    name: Build Windows .exe
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies (if requirements.txt present)
+      - name: Install dependencies
+        shell: powershell
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if (Test-Path "requirements.txt") {
+            pip install -r requirements.txt
+          }
           pip install pyinstaller
 
-      - name: Build Windows .exe (PyInstaller)
+      - name: Build EXE
+        shell: powershell
         run: |
-          pyinstaller --onefile --clean --name "${{ env.APP_NAME }}" "${{ env.MAIN_SCRIPT }}"
-          # On Windows the result will be in dist\BlockMeshAuto.exe
+          pyinstaller --onefile --clean --name $env:APP_NAME $env:MAIN_SCRIPT
 
-      - name: Upload Windows artifact
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-windows
           path: dist/*.exe
 
-      - name: Clean windows runner build files
+      - name: Clean Windows build files
+        shell: powershell
         run: |
-          rd /s /q build || exit 0
-          del /f /q *.spec || exit 0
-          rd /s /q dist || exit 0
+          Remove-Item build -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item dist -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item *.spec -Force -ErrorAction SilentlyContinue
+
 
   build-linux:
-    name: Build Linux AppImage
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Create venv & install deps
+      - name: Install dependencies
         run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install pyinstaller
 
-      - name: Build Linux single-file binary (PyInstaller)
+      - name: Build Linux Binary
         run: |
-          source venv/bin/activate
-          pyinstaller --onefile --clean --name "${{ env.APP_NAME }}" "${{ env.MAIN_SCRIPT }}" \
-            --distpath dist --workpath build
+          pyinstaller --onefile --clean --name $APP_NAME $MAIN_SCRIPT
           ls -la dist
 
-      - name: Smoke test Linux binary
+      - name: Smoke Test Binary
         run: |
-          ./dist/${{ env.APP_NAME }} --help || echo "help failed - trying --version"
-          ./dist/${{ env.APP_NAME }} --version || echo "version not supported; binary executed exit=$?"
+          chmod +x dist/$APP_NAME
+          ./dist/$APP_NAME --help || true
 
-      - name: Prepare AppDir for AppImage
+      - name: Prepare AppDir
         run: |
           mkdir -p AppDir/usr/bin
-          cp dist/${{ env.APP_NAME }} AppDir/usr/bin/${{ env.APP_NAME }}
-          # Desktop entry (simple). Put a better one in repo if you want.
+          cp dist/$APP_NAME AppDir/usr/bin/
+
           mkdir -p AppDir/usr/share/applications
-          cat > AppDir/usr/share/applications/${{ env.APP_NAME }}.desktop <<EOF
-          [Desktop Entry]
-          Type=Application
-          Name=${{ env.APP_NAME }}
-          Exec=${{ env.APP_NAME }}
-          Icon=${{ env.APP_NAME }}
-          Categories=Utility;
-          EOF
-          # optionally add an icon in repo and copy it to AppDir/usr/share/icons/hicolor/256x256/apps/
+          echo "[Desktop Entry]" > AppDir/usr/share/applications/$APP_NAME.desktop
+          echo "Type=Application" >> AppDir/usr/share/applications/$APP_NAME.desktop
+          echo "Name=$APP_NAME" >> AppDir/usr/share/applications/$APP_NAME.desktop
+          echo "Exec=$APP_NAME" >> AppDir/usr/share/applications/$APP_NAME.desktop
+          echo "Categories=Utility;" >> AppDir/usr/share/applications/$APP_NAME.desktop
 
       - name: Download appimagetool
         run: |
@@ -99,16 +97,15 @@ jobs:
 
       - name: Build AppImage
         run: |
-          # appimagetool will create an AppImage from AppDir
-          ./appimagetool.AppImage AppDir || ( echo "appimagetool failed" && ls -la && exit 1 )
-          # produced file looks like ${APP_NAME}-x86_64.AppImage
+          ./appimagetool.AppImage AppDir
+          ls -la *.AppImage
 
-      - name: Upload Linux AppImage artifact
+      - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-linux
-          path: *.AppImage
+          path: "*.AppImage"
 
-      - name: Clean linux runner build files
+      - name: Clean Linux build files
         run: |
-          rm -rf build dist *.spec AppDir appimagetool.AppImage venv || true
+          rm -rf build dist *.spec AppDir appimagetool.AppImage

@@ -8,7 +8,7 @@ on:
 env:
   PYTHON_VERSION: "3.11"
   APP_NAME: "BlockMeshAuto"
-  MAIN_SCRIPT: "main.py"   # CHANGE if needed
+  MAIN_SCRIPT: "main.py"   # CHANGE if your entry file is different
 
 jobs:
 
@@ -95,14 +95,11 @@ jobs:
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
 
-      - name: Install appimagetool
+      - name: Build AppImage (FUSE safe)
         run: |
-          sudo apt update
-          sudo apt install -y appimagetool
-
-      - name: Build AppImage
-        run: |
-          appimagetool AppDir
+          ./appimagetool.AppImage --appimage-extract
+          ./squashfs-root/AppRun AppDir
+          ls -la *.AppImage
 
       - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
@@ -112,4 +109,4 @@ jobs:
 
       - name: Clean Linux build files
         run: |
-          rm -rf build dist *.spec AppDir appimagetool.AppImage
+          rm -rf build dist *.spec AppDir appimagetool.AppImage squashfs-root

@@ -95,10 +95,14 @@ jobs:
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
 
+      - name: Install appimagetool
+        run: |
+          sudo apt update
+          sudo apt install -y appimagetool
+
       - name: Build AppImage
         run: |
-          ./appimagetool.AppImage AppDir
-          ls -la *.AppImage
+          appimagetool AppDir
 
       - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4

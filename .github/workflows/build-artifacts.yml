@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 env:
   PYTHON_VERSION: "3.11"
   APP_NAME: "BlockMeshAuto"
@@ -73,16 +76,21 @@ jobs:
           New-Item -ItemType Directory -Force -Path applications | Out-Null
           Copy-Item "dist\$env:APP_NAME.exe" "applications\$env:APP_NAME.exe" -Force
           git add "applications/$env:APP_NAME.exe"
-          git diff --cached --quiet || git commit -m "ci: update $env:APP_NAME.exe [skip ci]"
-          git push
+          $status = git diff --cached --name-only
+          if ($status) {
+            git commit -m "ci: update $env:APP_NAME.exe [skip ci]"
+            git push
+          } else {
+            Write-Host "No changes to commit."
+          }
 
       - name: Clean Windows build files
         shell: powershell
         run: |
-          Remove-Item build   -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item dist    -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item *.spec  -Force         -ErrorAction SilentlyContinue
-          Remove-Item app_icon.ico -Force    -ErrorAction SilentlyContinue
+          Remove-Item build        -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item dist         -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item *.spec       -Force          -ErrorAction SilentlyContinue
+          Remove-Item app_icon.ico -Force          -ErrorAction SilentlyContinue
 
 
   # ─────────────────────────────────────────────
@@ -134,11 +142,11 @@ jobs:
           Icon=$APP_NAME
           Categories=Utility;
           EOF
-          sed -i 's/^[[:space:]]*//' "AppDir/$APP_NAME.desktop"   # strip leading spaces
+          sed -i 's/^[[:space:]]*//' "AppDir/$APP_NAME.desktop"
           chmod 0644 "AppDir/$APP_NAME.desktop"
           cp "AppDir/$APP_NAME.desktop" "AppDir/usr/share/applications/$APP_NAME.desktop"
 
-          # Icon — use repo logo if present, otherwise generate a 1×1 placeholder
+          # Icon - use repo logo if present, otherwise generate a 1x1 placeholder
           if [ -f "$LOGO_PATH" ]; then
             cp "$LOGO_PATH" "AppDir/$APP_NAME.png"
             cp "$LOGO_PATH" "AppDir/usr/share/icons/hicolor/256x256/apps/$APP_NAME.png"
@@ -147,7 +155,7 @@ jobs:
             printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' \
               > "AppDir/$APP_NAME.png"
             cp "AppDir/$APP_NAME.png" "AppDir/usr/share/icons/hicolor/256x256/apps/$APP_NAME.png"
-            echo "WARNING: $LOGO_PATH not found — used 1×1 placeholder icon."
+            echo "WARNING: $LOGO_PATH not found - used 1x1 placeholder icon."
           fi
 
           echo "--- AppDir layout ---"
@@ -162,12 +170,11 @@ jobs:
 
       - name: Build AppImage
         run: |
-          # Extract to avoid FUSE requirement on GitHub-hosted runners
           ./appimagetool.AppImage --appimage-extract
           ARCH=x86_64 ./squashfs-root/AppRun AppDir "$APP_NAME-linux-x86_64.AppImage"
           echo "--- Produced files ---"
           ls -lh ./*.AppImage
-      
+
       - name: Commit AppImage to repo
         run: |
           git config user.name "github-actions[bot]"
@@ -175,8 +182,12 @@ jobs:
           mkdir -p applications
           cp "$APP_NAME-linux-x86_64.AppImage" "applications/$APP_NAME-linux-x86_64.AppImage"
           git add "applications/$APP_NAME-linux-x86_64.AppImage"
-          git diff --cached --quiet || git commit -m "ci: update $APP_NAME AppImage [skip ci]"
-          git push
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: update $APP_NAME AppImage [skip ci]"
+            git push
+          else
+            echo "No changes to commit."
+          fi
 
       - name: Clean Linux build files
         run: |

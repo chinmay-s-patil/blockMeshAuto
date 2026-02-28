@@ -134,3 +134,5 @@ mesh_temp.json
 
 #Do not ignore Examples
 !Examples/**/*.json
+
+!new_data_structure.json

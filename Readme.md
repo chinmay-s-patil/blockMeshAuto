@@ -1,182 +1,82 @@
-# OpenFOAM blockMesh Builder
+# BlockMeshAuto
 
-A GUI tool for creating OpenFOAM `blockMeshDict` files with 2D layer-based editing and 3D visualization.
+A powerful and intuitive GUI tool for creating OpenFOAM `blockMeshDict` files. Featuring 2D layer-based editing and real-time 3D visualization, it simplifies the process of manual mesh generation for OpenFOAM.
 
-## Installation
+![BlockMeshAuto UI](https://via.placeholder.com/800x450/1e1e1e/d4d4d4?text=BlockMeshAuto+UI)
 
-### Ubuntu 24.04
+## 🚀 Features
 
-```bash
-pip install matplotlib numpy
-```
+- **Modular Workflow**: Six dedicated tabs for Project Settings, 2D Editing, Edge Definition, Hex Block Creation, Patch Assignment, and Export.
+- **2D Layer-Based Editor**: Design your base profile with precision using multiple Z-planes.
+- **Point & Connection Management**: Easily manage points and link them with straight lines, arcs, or splines.
+- **3D Visualization**: Real-time 3D rendering of your mesh geometry and hex blocks.
+- **Interactive Patch Assignment**: Assign boundary patches (walls, inlets, outlets) directly on the 3D model.
+- **Project Persistence**: Save and load your work in a human-readable JSON format.
+- **OpenFOAM Optimized**: Export clean, valid `blockMeshDict` files ready for use in your CFD simulations.
+- **Dark Mode UI**: Professional, eyes-friendly interface designed for long engineering sessions.
 
-Or use the requirements file:
+## 🛠️ Installation
 
-```bash
-pip install -r requirements.txt
-```
+### Prerequisites
 
-## File Structure
+- **Python 3.10+**
+- **pip** (Python package installer)
 
-```
-mesh-builder/
-├── main.py              # Main application GUI
-├── mesh_data.py         # Data structures
-├── blockmesh_export.py  # OpenFOAM export
-├── viewer_3d.py         # 3D visualization
-├── requirements.txt     # Dependencies
-├── README.md           # This file
-└── mesh_temp.json      # Auto-saved temporary file
-```
+### Setup
 
-## Features
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/chinmay-s-patil/blockMeshAuto.git
+   cd blockMeshAuto
+   ```
 
-✅ **Three editing modes**: Select, Add, Delete points  
-✅ **Layer-based 2D editing** with multiple Z-planes  
-✅ **Layer duplication** for quick geometry replication  
-✅ **ISO mode** for linking points between layers  
-✅ **Interactive 3D visualization** with pan/zoom/rotate  
-✅ **Face selection toggle** for 3D patch assignment  
-✅ **JSON save/load** for project persistence  
-✅ **Auto-save** every 30 seconds  
-✅ **Export to OpenFOAM blockMeshDict** format  
+2. Install the required dependencies:
+   ```bash
+   pip install -r Code/requirements.txt
+   ```
 
-## Usage
+## 📖 Usage
 
-Run the application:
+Navigate to the `Code` directory and run the main application:
 
 ```bash
+cd Code
 python main.py
 ```
 
-## Top Bar Controls
+### Workflow Overview
 
-**💾 Save** - Save your project to JSON  
-**📂 Load** - Load a project from JSON  
-**🔄 New** - Start a new project (with save prompt)  
+1.  **Project Settings**: Set your project name, description, unit system, and sketch plane.
+2.  **Points & Connections**: Create your 2D profile. Use layers for different Z-elevations.
+3.  **Edge Editor**: Define curved edges (arcs, splines) between points.
+4.  **Hex Blocks**: Build hexahedral blocks by selecting corresponding points on different layers.
+5.  **Hex View & Patches**: Inspect your 3D mesh and assign boundary faces to named patches.
+6.  **Export**: Review the generated `blockMeshDict` and save it to your OpenFOAM project.
 
-Projects are automatically saved to `mesh_temp.json` every 30 seconds.
+## 📁 Project Structure
 
-## Workflow
-
-### Tab 1: Points & Connections (2D Editor)
-
-1. **Mode Selection** (3 modes with visual indicators)
-   - **Select Mode** (Blue) - Click points to select them for connections
-   - **Add Mode** (Green) - Click canvas to add new points
-   - **Delete Mode** (Red) - Click points to delete them
-
-2. **Layer Management**
-   - Create multiple Z-layers using "Add"
-   - "Duplicate" to copy current layer's geometry
-   - "Remove" to delete a layer
-   - Each layer represents a different Z-plane
-
-3. **Normal Mode (Single Layer)**
-   - Select a layer to work on
-   - Add points by clicking or manual entry
-   - Select 2 points → "Create Connection" to link them
-
-4. **ISO Mode (Link Between Layers)**
-   - Enable "Iso Mode (Link 2 Layers)" checkbox
-   - Select exactly 2 layers from the layer list (hold Ctrl)
-   - Both layers appear overlaid (red and blue)
-   - Click points from either layer to select them
-   - Green circles highlight selected points
-   - "Create Connection" links points across layers
-   - Green dashed lines show inter-layer connections
-
-### Tab 2: 3D View & Patches
-
-1. **3D Visualization**
-   - Click "🔄 Update 3D View" to refresh
-   - Toolbar controls:
-     - **Pan**: Right-click and drag
-     - **Zoom**: Scroll wheel
-     - **Rotate**: Left-click and drag
-   - Blue lines: horizontal connections (within layers)
-   - Green dashed: inter-layer connections
-   - Gray dotted: auto-connections between layers
-
-2. **Face Selection**
-   - Enable "Enable Face Selection" checkbox
-   - Click on mesh faces to select them
-   - Selected faces change color (cyan/yellow)
-   - Multiple faces can be selected
-
-3. **Patch Assignment**
-   - Enter a patch name (e.g., "inlet", "outlet", "walls")
-   - Select patch type:
-     - `wall` - Solid wall boundary
-     - `patch` - Generic patch
-     - `symmetry` - Symmetry plane
-     - `symmetryPlane` - Symmetry plane (newer syntax)
-     - `wedge` - Axisymmetric wedge
-     - `empty` - Empty boundary for 2D cases
-     - `cyclic` - Cyclic boundary
-   - Click "Assign to Selected Faces"
-   - Patch appears in "Defined Patches" list
-
-### Tab 3: Export blockMeshDict
-
-1. **Preview**
-   - Click "Generate & Preview" to see the blockMeshDict content
-   - Review vertices, blocks, and boundary patches
-
-2. **Save**
-   - Click "Save to File" to export
-   - Choose location and filename
-   - Default name is `blockMeshDict`
-
-## Keyboard Shortcuts
-
-- **Ctrl + Click**: Multi-select layers in ISO mode
-- **Tab**: Switch between sections
-- **Mouse wheel**: Zoom in 3D view
-- **Left-click drag**: Rotate 3D view
-- **Right-click drag**: Pan 3D view
-
-## Tips
-
-- Start with Layer 0, add points and connections
-- Use "Duplicate" to create parallel layers quickly
-- Use ISO mode to link corresponding points between layers
-- Enable "Face Selection" before clicking faces in 3D view
-- Save your work frequently (auto-saves every 30 seconds)
-- Load previous projects to continue editing
-
-## Data Persistence
-
-- **Auto-save**: Saves to `mesh_temp.json` every 30 seconds
-- **Manual save**: Use 💾 Save button for named projects
-- **JSON format**: Human-readable, easy to version control
-- Stores: layers, points, connections, inter-layer links, patches
-
-## OpenFOAM Integration
-
-After exporting `blockMeshDict`:
-
-1. Place it in your case's `system/` directory
-2. Run `blockMesh` to generate the mesh
-3. Check with `checkMesh`
-
-```bash
-blockMesh
-checkMesh
+```text
+BlockMeshAuto/
+├── Code/
+│   ├── main.py                # Application entry point
+│   ├── mesh_data.py           # Core data management
+│   ├── tab1_projectSettings/  # Tab 1 modules
+│   ├── tab2_2DEditor/         # Tab 2 modules
+│   ├── tab3_Edges/            # Tab 3 modules
+│   ├── tab4_Hex/              # Tab 4 modules
+│   ├── tab5_Patches/          # Tab 5 modules
+│   ├── tab6_export/           # Tab 6 modules
+│   ├── utils/                 # Shared utilities
+│   └── requirements.txt       # Project dependencies
+├── Examples/                  # Sample JSON projects
+├── Trial Case/                # OpenFOAM test case
+└── README.md                  # This file
 ```
 
-## Troubleshooting
+## 🤝 Contributing
 
-**ISO mode not working**: Make sure you've selected exactly 2 layers (Ctrl+Click)
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-**Points not visible in ISO mode**: Selected points show as large green circles
+## 📄 License
 
-**Face selection not working**: Enable "Enable Face Selection" checkbox in Tab 2
-
-**3D view empty**: Click "Update 3D View" after making changes in Tab 1
-
-**Export fails**: Ensure you have at least 2 layers with matching point counts
-
-## License
-
-MIT License - Feel free to modify and distribute
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

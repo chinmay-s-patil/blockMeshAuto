@@ -8,10 +8,14 @@ on:
 env:
   PYTHON_VERSION: "3.11"
   APP_NAME: "BlockMeshAuto"
-  MAIN_SCRIPT: "main.py"   # CHANGE if your entry file is different
+  MAIN_SCRIPT: "main.py"
+  LOGO_PATH: "BlockMeshLogo.png"
 
 jobs:
 
+  # ─────────────────────────────────────────────
+  #  Windows — EXE with embedded icon
+  # ─────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
 
@@ -30,12 +34,36 @@ jobs:
           if (Test-Path "requirements.txt") {
             pip install -r requirements.txt
           }
-          pip install pyinstaller
+          pip install pyinstaller Pillow
+
+      - name: Convert PNG logo to ICO
+        shell: powershell
+        run: |
+          python - <<'EOF'
+          from PIL import Image
+          import sys, os
+
+          logo = os.environ.get("LOGO_PATH", "BlockMeshLogo.png")
+          if not os.path.exists(logo):
+              print(f"WARNING: {logo} not found — building without icon.")
+              sys.exit(0)
+
+          img = Image.open(logo).convert("RGBA")
+          sizes = [(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]
+          icons = [img.resize(s, Image.LANCZOS) for s in sizes]
+          icons[0].save("app_icon.ico", format="ICO", append_images=icons[1:],
+                        sizes=sizes)
+          print("app_icon.ico created.")
+          EOF
 
       - name: Build EXE
         shell: powershell
         run: |
-          pyinstaller --onefile --clean --name $env:APP_NAME $env:MAIN_SCRIPT
+          $iconArg = ""
+          if (Test-Path "app_icon.ico") {
+            $iconArg = "--icon=app_icon.ico"
+          }
+          pyinstaller --onefile --clean --name $env:APP_NAME $iconArg $env:MAIN_SCRIPT
 
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
@@ -46,11 +74,15 @@ jobs:
       - name: Clean Windows build files
         shell: powershell
         run: |
-          Remove-Item build -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item dist -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item *.spec -Force -ErrorAction SilentlyContinue
+          Remove-Item build   -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item dist    -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item *.spec  -Force         -ErrorAction SilentlyContinue
+          Remove-Item app_icon.ico -Force    -ErrorAction SilentlyContinue
 
 
+  # ─────────────────────────────────────────────
+  #  Linux — AppImage with PNG icon
+  # ─────────────────────────────────────────────
   build-linux:
     runs-on: ubuntu-latest
 
@@ -71,53 +103,65 @@ jobs:
       - name: Build Linux Binary
         run: |
           pyinstaller --onefile --clean --name "$APP_NAME" "$MAIN_SCRIPT"
-          ls -la dist
+          ls -la dist/
 
       - name: Smoke Test Binary
         run: |
           chmod +x "dist/$APP_NAME"
-          ./dist/"$APP_NAME" --help || true
+          "./dist/$APP_NAME" --help || true
 
-      - name: Prepare AppDir (create root desktop file required by appimagetool)
+      - name: Prepare AppDir
         run: |
           mkdir -p AppDir/usr/bin
-          cp "dist/$APP_NAME" "AppDir/usr/bin/"
-
-          # Root .desktop file is REQUIRED at AppDir/<app>.desktop
           mkdir -p AppDir/usr/share/applications
-          printf '%s\n' \
-            '[Desktop Entry]' \
-            'Type=Application' \
-            "Name=$APP_NAME" \
-            "Exec=usr/bin/$APP_NAME" \
-            "Icon=$APP_NAME" \
-            'Categories=Utility;' \
-            > "AppDir/$APP_NAME.desktop"
-          chmod 0644 "AppDir/$APP_NAME.desktop"
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
 
-          # copy into standard location too
+          # Binary
+          cp "dist/$APP_NAME" "AppDir/usr/bin/$APP_NAME"
+          chmod +x "AppDir/usr/bin/$APP_NAME"
+
+          # Desktop file (required at AppDir root AND in standard location)
+          cat > "AppDir/$APP_NAME.desktop" <<EOF
+          [Desktop Entry]
+          Type=Application
+          Name=$APP_NAME
+          Exec=usr/bin/$APP_NAME
+          Icon=$APP_NAME
+          Categories=Utility;
+          EOF
+          sed -i 's/^[[:space:]]*//' "AppDir/$APP_NAME.desktop"   # strip leading spaces
+          chmod 0644 "AppDir/$APP_NAME.desktop"
           cp "AppDir/$APP_NAME.desktop" "AppDir/usr/share/applications/$APP_NAME.desktop"
 
-          # Optionally copy icon(s) if you have one in repo at assets/icon.png
-          # mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          # cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/"$APP_NAME".png
+          # Icon — use repo logo if present, otherwise generate a 1×1 placeholder
+          if [ -f "$LOGO_PATH" ]; then
+            cp "$LOGO_PATH" "AppDir/$APP_NAME.png"
+            cp "$LOGO_PATH" "AppDir/usr/share/icons/hicolor/256x256/apps/$APP_NAME.png"
+            echo "Logo copied from $LOGO_PATH"
+          else
+            printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' \
+              > "AppDir/$APP_NAME.png"
+            cp "AppDir/$APP_NAME.png" "AppDir/usr/share/icons/hicolor/256x256/apps/$APP_NAME.png"
+            echo "WARNING: $LOGO_PATH not found — used 1×1 placeholder icon."
+          fi
 
-          echo "AppDir layout (preview):"
-          find AppDir -maxdepth 3 -type f -print || true
+          echo "--- AppDir layout ---"
+          find AppDir -type f
 
       - name: Download appimagetool
         run: |
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
+          wget -q \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
-          echo "appimagetool size:"
-          ls -lh appimagetool.AppImage
 
-      - name: Build AppImage (FUSE safe: extract then run)
+      - name: Build AppImage
         run: |
+          # Extract to avoid FUSE requirement on GitHub-hosted runners
           ./appimagetool.AppImage --appimage-extract
-          ./squashfs-root/AppRun AppDir
-          echo "Produced files:"
-          ls -la *.AppImage || true
+          ARCH=x86_64 ./squashfs-root/AppRun AppDir "$APP_NAME-linux-x86_64.AppImage"
+          echo "--- Produced files ---"
+          ls -lh ./*.AppImage
 
       - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4

@@ -1056,7 +1056,7 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
         # Create edit window with dark mode
         self.edit_window = tk.Toplevel(self.parent)
         self.edit_window.title(f"Edit Block {block_id}")
-        self.edit_window.geometry("350x550")
+        self.edit_window.geometry("400x850")
         self.edit_window.transient(self.parent)
         self.edit_window.grab_set()
         self.edit_window.configure(bg=self.colors['secondary'])

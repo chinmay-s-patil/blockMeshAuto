@@ -106,18 +106,42 @@ def duplicate_layer(self):
 
 
 def remove_layer(self):
-    """Remove current layer (points are dereferenced, not deleted)"""
+    """Remove current layer and DELETE all points on it"""
     if len(self.mesh_data.layers) <= 1:
         messagebox.showwarning("Warning", "Cannot remove last layer")
         return
     
     current = self.mesh_data.current_layer
-    if messagebox.askyesno("Confirm", f"Remove layer '{current}'?\nPoints will remain in global storage."):
+    
+    # Get the points that will be deleted BEFORE removing the layer
+    layer_data = self.mesh_data.layers.get(current, {})
+    points_to_delete = layer_data.get('point_refs', [])
+    
+    if messagebox.askyesno("Confirm", 
+                          f"Remove layer '{current}'?\n"
+                          f"This will permanently delete {len(points_to_delete)} points."):
+        
+        # Save undo state
+        self.mesh_data.save_state()
+        
+        # FIXED: Actually delete all points on this layer
+        for point_id in points_to_delete:
+            self.mesh_data.remove_point(point_id)
+        
+        # Now remove the layer itself
         self.mesh_data.remove_layer(current)
-        self.mesh_data.current_layer = list(self.mesh_data.layers.keys())[0]
+        
+        # Update current layer reference
+        if self.mesh_data.layers:
+            self.mesh_data.current_layer = list(self.mesh_data.layers.keys())[0]
+        
         self.update_layer_list()
         self.update_dual_view_buttons()
         self.update_plot()
+        self.clear_selection()
+        
+        messagebox.showinfo("Deleted", 
+                          f"Layer '{current}' and {len(points_to_delete)} points deleted.")
 
 
 def extrude_layer(self):

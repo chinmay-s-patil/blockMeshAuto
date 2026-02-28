@@ -158,6 +158,12 @@ class Tab5HexPatches:
                  font=("Arial", 9, "bold"), relief=tk.FLAT,
                  activebackground='#3db89f').pack(side=tk.LEFT, padx=5, pady=2)
 
+        tk.Button(controls_frame, text="🔄 Refresh", 
+                 command=self._refresh_view,
+                 bg=self.colors['accent'], fg=self.colors['button_fg'],
+                 font=("Arial", 9, "bold"), relief=tk.FLAT,
+                 activebackground=self.colors['button_active']).pack(side=tk.LEFT, padx=5, pady=2)
+
         # Floating info label at bottom left
         info_label = tk.Label(self.canvas, 
                 text="Left: Select/Hide | Middle: Rotate | Right: Pan | Scroll: Zoom",

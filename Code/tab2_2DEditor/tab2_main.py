@@ -399,49 +399,6 @@ class Tab2DEditor:
         self.update_dual_view_buttons()
         self.update_plot()
 
-
-
-
-
-    def remove_layer(self):
-        """Remove the currently selected layer and delete all points on it"""
-        # Save undo state
-        self.mesh_data.save_state()
-
-        selected_index = self.layer_listbox.curselection()
-        if not selected_index:
-            messagebox.showwarning("Warning", "No layer selected to remove.")
-            return
-
-        layer_name = self.layer_listbox.get(selected_index[0]).split(" (z=")[0]
-
-        # Get the points that will be deleted
-        layer_data = self.mesh_data.layers.get(layer_name, {})
-        points_to_delete = layer_data.get('point_refs', [])
-
-        # If current layer is being deleted, switch to another layer first
-        if layer_name == self.mesh_data.current_layer and len(self.mesh_data.layers) > 1:
-            other_layers = [name for name in self.mesh_data.layers if name != layer_name]
-            if other_layers:
-                self.mesh_data.current_layer = other_layers[0]
-
-        if messagebox.askyesno("Confirm Delete", 
-                              f"Are you sure you want to delete layer '{layer_name}'?\n"
-                              f"This will permanently delete {len(points_to_delete)} points on this layer."):
-
-            # FIXED: Actually delete the points on this layer, not just dereference them
-            for point_id in points_to_delete:
-                self.mesh_data.remove_point(point_id)
-
-            # Now remove the layer itself
-            self.mesh_data.remove_layer(layer_name)
-
-            self.update_layer_list()
-            self.update_dual_view_buttons()
-            self.update_plot()
-            self.clear_selection()
-            messagebox.showinfo("Deleted", f"Layer '{layer_name}' and {len(points_to_delete)} points deleted.")
-
     def edit_layer_z(self):
         """Edit the Z-value of the currently selected layer"""
         # Save undo state

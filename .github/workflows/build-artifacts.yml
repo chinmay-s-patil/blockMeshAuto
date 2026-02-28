@@ -79,13 +79,15 @@ jobs:
           $status = git diff --cached --name-only
           if ($status) {
             git commit -m "ci: update $env:APP_NAME.exe [skip ci]"
-            $retries = 5
-            for ($i = 1; $i -le $retries; $i++) {
+            $pushed = $false
+            for ($i = 1; $i -le 5; $i++) {
               git pull --rebase origin main
-              git push && break
-              Write-Host "Push attempt $i failed, retrying..."
+              git push
+              if ($LASTEXITCODE -eq 0) { $pushed = $true; break }
+              Write-Host "Push attempt $i failed, retrying in 5s..."
               Start-Sleep -Seconds 5
             }
+            if (-not $pushed) { exit 1 }
           } else {
             Write-Host "No changes to commit."
           }

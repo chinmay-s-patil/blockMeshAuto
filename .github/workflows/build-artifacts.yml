@@ -79,7 +79,13 @@ jobs:
           $status = git diff --cached --name-only
           if ($status) {
             git commit -m "ci: update $env:APP_NAME.exe [skip ci]"
-            git push
+            $retries = 5
+            for ($i = 1; $i -le $retries; $i++) {
+              git pull --rebase origin main
+              git push && break
+              Write-Host "Push attempt $i failed, retrying..."
+              Start-Sleep -Seconds 5
+            }
           } else {
             Write-Host "No changes to commit."
           }
@@ -184,7 +190,12 @@ jobs:
           git add "applications/$APP_NAME-linux-x86_64.AppImage"
           if ! git diff --cached --quiet; then
             git commit -m "ci: update $APP_NAME AppImage [skip ci]"
-            git push
+            for i in 1 2 3 4 5; do
+              git pull --rebase origin main
+              git push && break
+              echo "Push attempt $i failed, retrying in 5s..."
+              sleep 5
+            done
           else
             echo "No changes to commit."
           fi

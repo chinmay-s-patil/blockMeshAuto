@@ -65,11 +65,16 @@ jobs:
           }
           pyinstaller --onefile --clean --name $env:APP_NAME $iconArg $env:MAIN_SCRIPT
 
-      - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.APP_NAME }}-windows
-          path: dist/*.exe
+      - name: Commit EXE to repo
+        shell: powershell
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          New-Item -ItemType Directory -Force -Path applications | Out-Null
+          Copy-Item "dist\$env:APP_NAME.exe" "applications\$env:APP_NAME.exe" -Force
+          git add "applications/$env:APP_NAME.exe"
+          git diff --cached --quiet || git commit -m "ci: update $env:APP_NAME.exe [skip ci]"
+          git push
 
       - name: Clean Windows build files
         shell: powershell
@@ -162,12 +167,16 @@ jobs:
           ARCH=x86_64 ./squashfs-root/AppRun AppDir "$APP_NAME-linux-x86_64.AppImage"
           echo "--- Produced files ---"
           ls -lh ./*.AppImage
-
-      - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.APP_NAME }}-linux
-          path: "*.AppImage"
+      
+      - name: Commit AppImage to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p applications
+          cp "$APP_NAME-linux-x86_64.AppImage" "applications/$APP_NAME-linux-x86_64.AppImage"
+          git add "applications/$APP_NAME-linux-x86_64.AppImage"
+          git diff --cached --quiet || git commit -m "ci: update $APP_NAME AppImage [skip ci]"
+          git push
 
       - name: Clean Linux build files
         run: |

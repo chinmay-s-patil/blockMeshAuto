@@ -39,22 +39,20 @@ jobs:
       - name: Convert PNG logo to ICO
         shell: powershell
         run: |
-          $script = @'
-import sys, os
-from PIL import Image
-
-logo = os.environ.get("LOGO_PATH", "BlockMeshLogo.png")
-if not os.path.exists(logo):
-    print(f"WARNING: {logo} not found - building without icon.")
-    sys.exit(0)
-
-img = Image.open(logo).convert("RGBA")
-sizes = [(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]
-icons = [img.resize(s, Image.LANCZOS) for s in sizes]
-icons[0].save("app_icon.ico", format="ICO", append_images=icons[1:], sizes=sizes)
-print("app_icon.ico created.")
-'@
-          $script | Out-File -FilePath "convert_icon.py" -Encoding utf8
+          $lines = @(
+            'import sys, os',
+            'from PIL import Image',
+            'logo = os.environ.get("LOGO_PATH", "BlockMeshLogo.png")',
+            'if not os.path.exists(logo):',
+            '    print("WARNING: " + logo + " not found - building without icon.")',
+            '    sys.exit(0)',
+            'img = Image.open(logo).convert("RGBA")',
+            'sizes = [(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]',
+            'icons = [img.resize(s, Image.LANCZOS) for s in sizes]',
+            'icons[0].save("app_icon.ico", format="ICO", append_images=icons[1:], sizes=sizes)',
+            'print("app_icon.ico created.")'
+          )
+          $lines | Out-File -FilePath "convert_icon.py" -Encoding utf8
           python convert_icon.py
           Remove-Item convert_icon.py -Force -ErrorAction SilentlyContinue
 

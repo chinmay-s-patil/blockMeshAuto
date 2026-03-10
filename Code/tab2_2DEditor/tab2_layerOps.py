@@ -113,9 +113,9 @@ def remove_layer(self):
     
     current = self.mesh_data.current_layer
     
-    # Get the points that will be deleted BEFORE removing the layer
+    # Get the points that will be deleted - MAKE A COPY!
     layer_data = self.mesh_data.layers.get(current, {})
-    points_to_delete = layer_data.get('point_refs', [])
+    points_to_delete = list(layer_data.get('point_refs', []))  # <-- FIX HERE
     
     if messagebox.askyesno("Confirm", 
                           f"Remove layer '{current}'?\n"
@@ -124,7 +124,7 @@ def remove_layer(self):
         # Save undo state
         self.mesh_data.save_state()
         
-        # FIXED: Actually delete all points on this layer
+        # Now safely delete all points on this layer
         for point_id in points_to_delete:
             self.mesh_data.remove_point(point_id)
         
@@ -182,6 +182,14 @@ def extrude_layer(self):
             # Create new point at same X,Y but new Z
             new_id = self.mesh_data.add_point(point_data['x'], point_data['y'], z, name)
             id_mapping[point_id] = new_id
+    
+    # print("Original Positions: ")
+    # print(original_positions)
+    # print()
+    
+    # print("ID Mapping: ")
+    # print(id_mapping)
+    # print()
     
     # Create inter-layer connections ONLY for overlapping points (same X,Y)
     num_inter_connections = 0

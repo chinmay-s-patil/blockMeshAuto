@@ -110,14 +110,26 @@ def setup_ui(self):
 
     # Mouse wheel scrolling
     def on_mousewheel(event):
-        right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        bbox = right_canvas.bbox("all")
+        if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+            right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         return "break"
+        
+    def scroll_up(event):
+        bbox = right_canvas.bbox("all")
+        if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+            right_canvas.yview_scroll(-1, "units")
+            
+    def scroll_down(event):
+        bbox = right_canvas.bbox("all")
+        if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+            right_canvas.yview_scroll(1, "units")
 
     # Bind mousewheel
     def bind_mousewheel_to_all(widget):
         widget.bind("<MouseWheel>", on_mousewheel)
-        widget.bind("<Button-4>", lambda e: right_canvas.yview_scroll(-1, "units"))
-        widget.bind("<Button-5>", lambda e: right_canvas.yview_scroll(1, "units"))
+        widget.bind("<Button-4>", scroll_up)
+        widget.bind("<Button-5>", scroll_down)
         for child in widget.winfo_children():
             bind_mousewheel_to_all(child)
 
@@ -126,12 +138,12 @@ def setup_ui(self):
 
     # Bind to canvas, scrollbar, and container
     right_canvas.bind("<MouseWheel>", on_mousewheel)
-    right_canvas.bind("<Button-4>", lambda e: right_canvas.yview_scroll(-1, "units"))
-    right_canvas.bind("<Button-5>", lambda e: right_canvas.yview_scroll(1, "units"))
+    right_canvas.bind("<Button-4>", scroll_up)
+    right_canvas.bind("<Button-5>", scroll_down)
     scrollbar.bind("<MouseWheel>", on_mousewheel)
     right_container.bind("<MouseWheel>", on_mousewheel)
-    right_container.bind("<Button-4>", lambda e: right_canvas.yview_scroll(-1, "units"))
-    right_container.bind("<Button-5>", lambda e: right_canvas.yview_scroll(1, "units"))
+    right_container.bind("<Button-4>", scroll_up)
+    right_container.bind("<Button-5>", scroll_down)
 
     # Store references
     self.right_canvas = right_canvas
@@ -141,7 +153,6 @@ def setup_ui(self):
     # Build controls
     self._setup_mode_controls(right_frame)
     self._setup_add_point_controls(right_frame)  # Add point mode controls
-    self._setup_edit_point_button(right_frame)   # NEW: Edit Selected Point button here
     self._setup_layer_controls(right_frame)
     self._setup_manual_entry(right_frame)
     self._setup_connection_controls(right_frame)

@@ -288,6 +288,14 @@ class Tab2DEditor:
                                     activeforeground=self.colors['button_fg'])
         self.delete_btn.pack(fill=tk.X, pady=2)
 
+        self.edit_btn = tk.Button(mode_frame, text="✎ Edit Point", 
+                                  command=self.edit_point,
+                                  bg=self.colors['accent'], fg=self.colors['button_fg'],
+                                  font=("Arial", 9, "bold"), relief=tk.FLAT,
+                                  activebackground=self.colors['button_active'],
+                                  activeforeground=self.colors['button_fg'])
+        self.edit_btn.pack(fill=tk.X, pady=2)
+
         self.mode_label = tk.Label(mode_frame, text="Current Mode: Select", 
                                    font=("Arial", 10, "bold"), fg=self.colors['accent'],
                                    bg=self.colors['secondary'])
@@ -511,12 +519,53 @@ class Tab2DEditor:
                 font=("Arial", 8), bg=self.colors['secondary'],
                 fg=self.colors['fg']).pack(anchor=tk.W, pady=(5,2))
 
-        dual_canvas_frame = tk.Frame(dual_frame, height=100, bg=self.colors['secondary'])
-        dual_canvas_frame.pack(fill=tk.BOTH)
-        dual_canvas_frame.pack_propagate(False)
+        # Scrollable frame for Dual View
+        dual_outer_frame = tk.Frame(dual_frame, height=120, bg=self.colors['secondary'])
+        dual_outer_frame.pack(fill=tk.BOTH, pady=(0, 5))
+        dual_outer_frame.pack_propagate(False)
 
-        self.dual_buttons_frame = tk.Frame(dual_canvas_frame, bg=self.colors['secondary'])
-        self.dual_buttons_frame.pack(fill=tk.BOTH)
+        dual_canvas = tk.Canvas(dual_outer_frame, bg=self.colors['secondary'], highlightthickness=0)
+        dual_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        dual_scroll = tk.Scrollbar(dual_outer_frame, orient="vertical", command=dual_canvas.yview)
+        dual_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        dual_canvas.configure(yscrollcommand=dual_scroll.set)
+
+        self.dual_buttons_frame = tk.Frame(dual_canvas, bg=self.colors['secondary'])
+        dual_window = dual_canvas.create_window((0, 0), window=self.dual_buttons_frame, anchor="nw")
+
+        def update_dual_scrollregion(event=None):
+            dual_canvas.update_idletasks()
+            bbox = dual_canvas.bbox("all")
+            if bbox:
+                dual_canvas.configure(scrollregion=bbox)
+            dual_canvas.itemconfig(dual_window, width=dual_canvas.winfo_width())
+
+        self.dual_buttons_frame.bind("<Configure>", update_dual_scrollregion)
+        dual_canvas.bind("<Configure>", update_dual_scrollregion)
+
+        # Bind mousewheel scrolling for this specifically
+        def on_dual_mousewheel(event):
+            bbox = dual_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > dual_canvas.winfo_height():
+                dual_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            return "break"
+            
+        def dual_scroll_up(event):
+            bbox = dual_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > dual_canvas.winfo_height():
+                dual_canvas.yview_scroll(-1, "units")
+            return "break"
+                
+        def dual_scroll_down(event):
+            bbox = dual_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > dual_canvas.winfo_height():
+                dual_canvas.yview_scroll(1, "units")
+            return "break"
+
+        dual_canvas.bind("<MouseWheel>", on_dual_mousewheel)
+        dual_canvas.bind("<Button-4>", dual_scroll_up)
+        dual_canvas.bind("<Button-5>", dual_scroll_down)
 
         self.update_dual_view_buttons()
 
@@ -561,18 +610,6 @@ class Tab2DEditor:
                 activebackground='#3db89f',
                 activeforeground=self.colors['bg'],
                 font=("Arial", 8, "bold"), width=6).pack(side=tk.LEFT, padx=2)
-
-    def _setup_edit_point_button(self, parent):
-        """Setup Edit Selected Point button - placed right after Add Point controls"""
-        edit_frame = tk.Frame(parent, bg=self.colors['secondary'])
-        edit_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        # Edit Selected Point button - full width like other buttons
-        tk.Button(edit_frame, text="✎ Edit Selected Point", command=self.edit_point,
-                 bg=self.colors['accent'], fg=self.colors['button_fg'],
-                 activebackground=self.colors['button_active'],
-                 font=("Arial", 10, "bold"), relief=tk.FLAT,
-                 width=25).pack(fill=tk.X)
 
     def _setup_connection_controls(self, parent):
         """Setup connection controls"""

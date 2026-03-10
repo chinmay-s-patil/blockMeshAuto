@@ -13,6 +13,7 @@ import tkinter as tk
 from tkinter import messagebox
 import numpy as np
 import math
+from matplotlib.path import Path
 
 
 class EmbeddedViewer:
@@ -108,6 +109,15 @@ class EmbeddedViewer:
                                    bg='#2d2d2d', fg='#aaaaaa', font=('Arial', 8))
         self.plane_label.pack(side=tk.RIGHT, padx=10)
 
+        # Add Select Mode Toggle
+        self.select_mode = tk.StringVar(value="Square")
+        tk.Radiobutton(self.toolbar, text="Square", variable=self.select_mode, value="Square",
+                      bg='#2d2d2d', fg='white', selectcolor='#404040', activebackground='#2d2d2d',
+                      activeforeground='white', font=('Arial', 8)).pack(side=tk.RIGHT, padx=2)
+        tk.Radiobutton(self.toolbar, text="Lasso", variable=self.select_mode, value="Lasso",
+                      bg='#2d2d2d', fg='white', selectcolor='#404040', activebackground='#2d2d2d',
+                      activeforeground='white', font=('Arial', 8)).pack(side=tk.RIGHT, padx=2)
+
         # Info label at bottom (floating)
         self.info_label = tk.Label(self.frame, 
                                   text=f"Middle: Rotate | Right: Pan | Scroll: Zoom | Click: Select | Plane: {self.sketch_plane}", 
@@ -122,10 +132,18 @@ class EmbeddedViewer:
         self.canvas.bind("<B3-Motion>", self._on_right_drag)
         self.canvas.bind("<ButtonRelease-3>", self._on_right_release)
         self.canvas.bind("<Button-1>", self._on_left_click)
+        self.canvas.bind("<B1-Motion>", self._on_left_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_left_release)
         self.canvas.bind("<MouseWheel>", self._on_scroll)
         self.canvas.bind("<Button-4>", self._on_scroll)
         self.canvas.bind("<Button-5>", self._on_scroll)
         self.canvas.bind("<Configure>", lambda e: self.draw())
+        
+        # Selection state
+        self.selection_start = None
+        self.selection_rect = None
+        self.is_dragging = False
+        self.lasso_points = []
         
     def _rebuild_coord_cache(self):
         """Cache all point coordinates by their actual point IDs"""
@@ -653,31 +671,103 @@ class EmbeddedViewer:
                                outline='#444444', width=1, stipple='gray50')
     
     def _on_left_click(self, event):
-        """Handle point picking - NOW USES ACTUAL POINT IDs"""
-        clicked_point = None
-        min_dist = float('inf')
+        """Start point selection"""
+        self.selection_start = (event.x, event.y)
+        self.is_dragging = False
+        self.lasso_points = [(event.x, event.y)]
+
+    def _on_left_drag(self, event):
+        """Draw selection rectangle or lasso"""
+        if not self.selection_start: return
+        self.is_dragging = True
         
-        # Find closest point within click radius
-        for point_id, (sx, sy) in self._screen_coords.items():
-            dist = ((sx - event.x)**2 + (sy - event.y)**2)**0.5
-            if dist < 15:
-                if dist < min_dist:
-                    min_dist = dist
-                    clicked_point = point_id
-        
-        if clicked_point is not None:
-            if clicked_point in self.selected_points:
-                self.selected_points.remove(clicked_point)
-            else:
-                if len(self.selected_points) < 8:
-                    self.selected_points.append(clicked_point)
-                else:
-                    messagebox.showwarning("Limit", "Maximum 8 points allowed")
-                    return
+        if self.selection_rect:
+            self.canvas.delete(self.selection_rect)
             
-            # Pass actual point IDs to parent
+        if getattr(self, 'select_mode', None) and self.select_mode.get() == "Lasso":
+            self.lasso_points.append((event.x, event.y))
+            flat_pts = [c for p in self.lasso_points for c in p]
+            if len(flat_pts) >= 4:
+                self.selection_rect = self.canvas.create_polygon(
+                    flat_pts, outline='#00ff00', fill='', dash=(4, 4), tags="selection_rect"
+                )
+        else:
+            x0, y0 = self.selection_start
+            x1, y1 = event.x, event.y
+            self.selection_rect = self.canvas.create_rectangle(
+                x0, y0, x1, y1, outline='#00ff00', dash=(4, 4), tags="selection_rect"
+            )
+
+    def _on_left_release(self, event):
+        """Complete selection - NOW USES ACTUAL POINT IDs"""
+        if not self.selection_start: return
+        
+        if self.selection_rect:
+            self.canvas.delete(self.selection_rect)
+            self.selection_rect = None
+            
+        if self.is_dragging:
+            selected_in_rect = []
+            if getattr(self, 'select_mode', None) and self.select_mode.get() == "Lasso":
+                if len(self.lasso_points) > 2:
+                    lasso_path = Path(self.lasso_points)
+                    for point_id, (sx, sy) in self._screen_coords.items():
+                        if lasso_path.contains_point((sx, sy)):
+                            selected_in_rect.append(point_id)
+            else:
+                # Rectangle selection
+                x0, y0 = self.selection_start
+                x1, y1 = event.x, event.y
+                xmin, xmax = min(x0, x1), max(x0, x1)
+                ymin, ymax = min(y0, y1), max(y0, y1)
+                
+                for point_id, (sx, sy) in self._screen_coords.items():
+                    if xmin <= sx <= xmax and ymin <= sy <= ymax:
+                        selected_in_rect.append(point_id)
+            
+            # Toggle logic
+            for pt in selected_in_rect:
+                if pt not in self.selected_points:
+                    if len(self.selected_points) < 8:
+                        self.selected_points.append(pt)
+                    else:
+                        messagebox.showwarning("Limit", "Maximum 8 points allowed")
+                        break
+                else:
+                    self.selected_points.remove(pt)
+                    
             self.parent_tab.on_selection_changed(self.selected_points.copy())
             self.draw()
+            
+        else:
+            # Single point selection
+            clicked_point = None
+            min_dist = float('inf')
+            
+            # Find closest point within click radius
+            for point_id, (sx, sy) in self._screen_coords.items():
+                dist = ((sx - event.x)**2 + (sy - event.y)**2)**0.5
+                if dist < 15:
+                    if dist < min_dist:
+                        min_dist = dist
+                        clicked_point = point_id
+            
+            if clicked_point is not None:
+                if clicked_point in self.selected_points:
+                    self.selected_points.remove(clicked_point)
+                else:
+                    if len(self.selected_points) < 8:
+                        self.selected_points.append(clicked_point)
+                    else:
+                        messagebox.showwarning("Limit", "Maximum 8 points allowed")
+                        return
+                
+                # Pass actual point IDs to parent
+                self.parent_tab.on_selection_changed(self.selected_points.copy())
+                self.draw()
+        
+        self.selection_start = None
+        self.is_dragging = False
     
     def _on_middle_click(self, event):
         """Handle middle mouse press for rotation"""

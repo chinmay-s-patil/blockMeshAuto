@@ -163,12 +163,24 @@ class ScrollableToggleFrame(tk.Frame):
         
     def _bind_mousewheel(self):
         def on_mousewheel(event):
-            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            bbox = self.canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > self.canvas.winfo_height():
+                self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
             return "break"
+            
+        def scroll_up(event):
+            bbox = self.canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > self.canvas.winfo_height():
+                self.canvas.yview_scroll(-1, "units")
+                
+        def scroll_down(event):
+            bbox = self.canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > self.canvas.winfo_height():
+                self.canvas.yview_scroll(1, "units")
         
         self.canvas.bind("<MouseWheel>", on_mousewheel)
-        self.canvas.bind("<Button-4>", lambda e: self.canvas.yview_scroll(-1, "units"))
-        self.canvas.bind("<Button-5>", lambda e: self.canvas.yview_scroll(1, "units"))
+        self.canvas.bind("<Button-4>", scroll_up)
+        self.canvas.bind("<Button-5>", scroll_down)
         
     def clear(self):
         for widget in self.content_frame.winfo_children():
@@ -324,13 +336,25 @@ class TabHexBlockMaking:
         
         # Mouse wheel scrolling
         def on_mousewheel(event):
-            right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            bbox = right_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+                right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
             return "break"
+        
+        def scroll_up(event):
+            bbox = right_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+                right_canvas.yview_scroll(-1, "units")
+                
+        def scroll_down(event):
+            bbox = right_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+                right_canvas.yview_scroll(1, "units")
         
         def bind_mousewheel_to_all(widget):
             widget.bind("<MouseWheel>", on_mousewheel)
-            widget.bind("<Button-4>", lambda e: right_canvas.yview_scroll(-1, "units"))
-            widget.bind("<Button-5>", lambda e: right_canvas.yview_scroll(1, "units"))
+            widget.bind("<Button-4>", scroll_up)
+            widget.bind("<Button-5>", scroll_down)
             for child in widget.winfo_children():
                 bind_mousewheel_to_all(child)
         
@@ -339,12 +363,12 @@ class TabHexBlockMaking:
         
         # Bind to canvas, scrollbar, and container
         right_canvas.bind("<MouseWheel>", on_mousewheel)
-        right_canvas.bind("<Button-4>", lambda e: right_canvas.yview_scroll(-1, "units"))
-        right_canvas.bind("<Button-5>", lambda e: right_canvas.yview_scroll(1, "units"))
+        right_canvas.bind("<Button-4>", scroll_up)
+        right_canvas.bind("<Button-5>", scroll_down)
         scrollbar.bind("<MouseWheel>", on_mousewheel)
         right_container.bind("<MouseWheel>", on_mousewheel)
-        right_container.bind("<Button-4>", lambda e: right_canvas.yview_scroll(-1, "units"))
-        right_container.bind("<Button-5>", lambda e: right_canvas.yview_scroll(1, "units"))
+        right_container.bind("<Button-4>", scroll_up)
+        right_container.bind("<Button-5>", scroll_down)
         
         # Store references
         self.right_canvas = right_canvas
@@ -353,7 +377,6 @@ class TabHexBlockMaking:
         
         # Notebook with dark styling
         style = ttk.Style()
-        style.theme_use('default')
         style.configure("TNotebook", background=self.colors['secondary'])
         style.configure("TNotebook.Tab", background=self.colors['secondary'],
                        foreground=self.colors['fg'])
@@ -737,13 +760,21 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
                     fg=self.colors['text_fg'],
                     insertbackground=self.colors['fg'],
                     highlightbackground=self.colors['border']).pack(side=tk.LEFT)
+        # Automake Toggle
+        self.automake_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(frame, text="Automake (Auto-sort 8 points & create)", 
+                       variable=self.automake_var, font=("Segoe UI", 9, "bold"),
+                       bg=self.colors['secondary'], fg=self.colors['fg'],
+                       selectcolor=self.colors['bg'],
+                       activebackground=self.colors['secondary'],
+                       activeforeground=self.colors['accent']).pack(anchor=tk.W, pady=(10, 0))
         
         # Create button
         tk.Button(frame, text="Create Hex Block", command=self.create_hex_block,
                  bg=self.colors['success'], fg=self.colors['bg'],
                  font=("Segoe UI", 11, "bold"), relief=tk.FLAT,
                  activebackground='#3db89f',
-                 activeforeground=self.colors['bg']).pack(fill=tk.X, pady=20)
+                 activeforeground=self.colors['bg']).pack(fill=tk.X, pady=(5, 20))
         
         self.update_division_ui()
         
@@ -866,8 +897,47 @@ Top layer: 4→5→6→7 (counter-clockwise, viewed from above)"""
             self.viewer.refresh()
     
     def on_selection_changed(self, selected_list):
-        """Called by viewer when points are clicked - PRESERVES ORDER"""
+        """Called by viewer when points are clicked"""
         self.selected_points = list(selected_list)
+        
+        if len(self.selected_points) == 8 and getattr(self, 'automake_var', None) and self.automake_var.get():
+            # Grab actual points to sort
+            pts = []
+            valid = True
+            for pid in self.selected_points:
+                p = self.mesh_data.get_point(pid)
+                if p:
+                    pts.append((pid, p['x'], p['y'], p['z']))
+                else:
+                    valid = False
+            
+            if valid and len(pts) == 8:
+                import math
+                pts.sort(key=lambda p: p[3])
+                bottom = pts[0:4]
+                top = pts[4:8]
+                
+                # Sort quadrilaterals Counter-Clockwise around their center
+                def sort_quad(quad):
+                    cx = sum(p[1] for p in quad) / 4
+                    cy = sum(p[2] for p in quad) / 4
+                    # atan2 gives angle from center; sort by angle gives CCW order
+                    return sorted(quad, key=lambda p: math.atan2(p[2] - cy, p[1] - cx))
+                
+                bottom = sort_quad(bottom)
+                top = sort_quad(top)
+                
+                self.selected_points = [p[0] for p in bottom + top]
+                # Tell viewer to sync selection order
+                self.viewer.selected_points = self.selected_points.copy()
+                
+                self.update_point_list()
+                self.point_status.config(text=f"Selected: 8/8 points (Automake)")
+                
+                # Auto create
+                self.create_hex_block()
+                return
+
         self.update_point_list()
         self.point_status.config(text=f"Selected: {len(self.selected_points)}/8 points")
     

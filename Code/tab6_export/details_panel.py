@@ -155,15 +155,17 @@ class MeshDetailsPanel(tk.Frame):
     
     def _on_mousewheel(self, event):
         """Handle mouse wheel scrolling"""
-        self.text.yview_scroll(int(-1*(event.delta/120)), "units")
+        if self.text.yview() != (0.0, 1.0):
+            self.text.yview_scroll(int(-1*(event.delta/120)), "units")
         return "break"
     
     def _on_mousewheel_linux(self, event):
         """Handle mouse wheel on Linux"""
-        if event.num == 4:
-            self.text.yview_scroll(-1, "units")
-        elif event.num == 5:
-            self.text.yview_scroll(1, "units")
+        if self.text.yview() != (0.0, 1.0):
+            if event.num == 4:
+                self.text.yview_scroll(-1, "units")
+            elif event.num == 5:
+                self.text.yview_scroll(1, "units")
         return "break"
 
 

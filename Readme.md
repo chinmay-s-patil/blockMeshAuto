@@ -23,13 +23,14 @@ BlockMeshAuto 2.0 is a massive leap forward, transitioning from a basic editor t
 
 ### 🚀 Major Highlights
 
-- **📂 BlockMesh Import (Game Changer!)**: Already have a `blockMeshDict`? Import it directly! BlockMeshAuto now parses existing files, reconstructs the geometry, and lets you edit them visually. No more manual coordinate hunting.
+- **📂 Variable-Aware Import**: Already have a `blockMeshDict`? Import it directly! The parser now supports dictionary-defined variables (e.g., `$x1`, `$x2`), making it fully compatible with parameterized OpenFOAM setups.
 - **🕒 Full History System**: Made a mistake? **Undo/Redo (Ctrl+Z / Ctrl+Y)** is now fully supported. Experiment with your designs with the confidence that you can always go back.
-- **💎 Optimized Data Structure**: I've completely rewritten how data is stored. Your project JSONs are now clean, human-readable, and significantly smaller. No more multi-million line files.
+- **🖥️ Fullscreen Mode (F11)**: Maximize your workspace with a single keystroke. A dedicated F11 toggle for a distraction-free mesh building experience.
+- **💎 Optimized Data Structure**: I've completely rewritten how data is stored. Your project JSONs are now clean, human-readable, and significantly smaller.
 - **🎨 Advanced 3D Visualization**: 
-  - **Internal Face Detection**: The 3D view now automatically hides internal faces, showing only what matters.
-  - **Patch Coloring**: Instantly see your boundary assignments with a high-contrast, color-coded patch legend.
-  - **Normal Visualization**: Verify your face orientations with interactive normal editing.
+  - **Internal Face Detection**: Automatically hides internal faces, showing only what matters.
+  - **Patch Coloring**: Color-coded patch legend for instant boundary verification.
+  - **Lasso & Box Selection**: High-speed vertex selection in the Hex Blocks tab using interactive selection tools.
 
 ---
 
@@ -38,9 +39,10 @@ BlockMeshAuto 2.0 is a massive leap forward, transitioning from a basic editor t
 - **Modular Workflow**: 6 dedicated tabs guide you from project setup to 2D sketching, edge definition, hex block creation, and patch assignment.
 - **2D Layer-Based Editor**: Design complex profiles with precision using multiple Z-plane layers.
 - **Point & Connection Logic**: Manage global points as a single source of truth, ensuring perfect connectivity across blocks.
-- **Interactive Patch Assignment**: Assign boundary faces (walls, inlets, outlets) directly on the 3D model with a single click.
+- **Interactive Patch Assignment**: Assign boundary faces directly on the 3D model with a single click.
+- **⚙️ Automake Toggle**: Speed up block creation with the Automake feature—automatically sort 8 points and generate hex blocks.
 - **OpenFOAM Optimized**: Export clean, standard-compliant `blockMeshDict` files ready for CFD simulation.
-- **Professional Dark Mode**: A sleek, high-contrast interface designed for long engineering sessions.
+- **Professional Dark Mode**: A sleek, high-contrast, professional-grade interface with refined scrolling and borderless dashboard components.
 
 ---
 

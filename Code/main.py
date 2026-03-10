@@ -33,6 +33,7 @@ class MeshBuilderApp:
         # Track all pending after callbacks for proper cleanup
         self._pending_after_ids = []
         self._auto_save_id = None
+        self.is_fullscreen = False
 
         # Dark mode colors
         self.colors = {
@@ -245,6 +246,7 @@ class MeshBuilderApp:
         self.root.bind('<Control-y>', self.on_redo_event)
         self.root.bind('<Control-Y>', self.on_redo_event)
         self.root.bind('<Control-Shift-Z>', self.on_redo_event)  # Common alternative for redo
+        self.root.bind('<F11>', self.toggle_fullscreen)
 
     def on_undo_event(self, event):
         self.on_undo()
@@ -252,6 +254,12 @@ class MeshBuilderApp:
 
     def on_redo_event(self, event):
         self.on_redo()
+        return "break"
+
+    def toggle_fullscreen(self, event=None):
+        """Toggle fullscreen mode"""
+        self.is_fullscreen = not self.is_fullscreen
+        self.root.attributes("-fullscreen", self.is_fullscreen)
         return "break"
 
     def on_undo(self):
@@ -342,7 +350,7 @@ class MeshBuilderApp:
         try:
             filename = filedialog.asksaveasfilename(
                 defaultextension=".json",
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                filetypes=[("JSON files", "*.json"), ("All files", "*")],
                 initialfile=default_filename
             )
         except Exception as e:
@@ -371,7 +379,7 @@ class MeshBuilderApp:
         """Load project from JSON file with better error handling"""
         try:
             filename = filedialog.askopenfilename(
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+                filetypes=[("JSON files", "*.json"), ("All files", "*")]
             )
         except Exception as e:
             messagebox.showerror("Dialog Error", f"Could not open file dialog: {e}")

@@ -207,13 +207,25 @@ class Tab5HexPatches:
 
         # Mouse wheel scrolling
         def on_mousewheel(event):
-            right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            bbox = right_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+                right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
             return "break"
+
+        def scroll_up(event):
+            bbox = right_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+                right_canvas.yview_scroll(-1, "units")
+                
+        def scroll_down(event):
+            bbox = right_canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > right_canvas.winfo_height():
+                right_canvas.yview_scroll(1, "units")
 
         def bind_mousewheel(widget):
             widget.bind("<MouseWheel>", on_mousewheel)
-            widget.bind("<Button-4>", lambda e: right_canvas.yview_scroll(-1, "units"))
-            widget.bind("<Button-5>", lambda e: right_canvas.yview_scroll(1, "units"))
+            widget.bind("<Button-4>", scroll_up)
+            widget.bind("<Button-5>", scroll_down)
             for child in widget.winfo_children():
                 bind_mousewheel(child)
 
@@ -594,10 +606,10 @@ class Tab5HexPatches:
 
             existing['faces'] = merged_faces
         else:
-            if patch_name in self.mesh_data.patches:
-                print(f"Overwriting existing patch: {patch_name}")
-            else:
-                print(f"Creating new patch: {patch_name}")
+            # if patch_name in self.mesh_data.patches:
+            #     print(f"Overwriting existing patch: {patch_name}")
+            # else:
+            #     print(f"Creating new patch: {patch_name}")
 
             store_data = {k: v for k, v in patch_data.items() if k != 'mode'}
             self.mesh_data.patches[patch_name] = store_data

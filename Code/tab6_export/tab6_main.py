@@ -137,7 +137,6 @@ class TabExport:
         
         # Create styled notebook
         style = ttk.Style()
-        style.theme_use('default')
         style.configure("TNotebook", background=self.colors['secondary'], borderwidth=0)
         style.configure("TNotebook.Tab", 
                        background=self.colors['secondary'],
@@ -280,18 +279,29 @@ class TabExport:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Bind mousewheel only when this tab is active (not bind_all)
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            bbox = canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > canvas.winfo_height():
+                canvas.yview_scroll(int(-1*(event.delta/120)), "units")
             return "break"
         
         def _on_mousewheel_linux(event):
-            if event.num == 4:
-                canvas.yview_scroll(-1, "units")
-            elif event.num == 5:
-                canvas.yview_scroll(1, "units")
+            bbox = canvas.bbox("all")
+            if bbox and (bbox[3] - bbox[1]) > canvas.winfo_height():
+                if event.num == 4:
+                    canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    canvas.yview_scroll(1, "units")
             return "break"
         
+        def bind_mousewheel_recursive(widget):
+            widget.bind("<MouseWheel>", _on_mousewheel)
+            widget.bind("<Button-4>", _on_mousewheel_linux)
+            widget.bind("<Button-5>", _on_mousewheel_linux)
+            for child in widget.winfo_children():
+                bind_mousewheel_recursive(child)
+        
+        bind_mousewheel_recursive(scrollable_frame)
         canvas.bind("<MouseWheel>", _on_mousewheel)
         canvas.bind("<Button-4>", _on_mousewheel_linux)
         canvas.bind("<Button-5>", _on_mousewheel_linux)
@@ -695,12 +705,15 @@ class TabExport:
     def generate_blockmesh_dict(self):
         """Generate the complete blockMeshDict content"""
         lines = []
+        # Format project name for header (max 35 chars, left-justified, space-padded)
+        project_name = self.mesh_data.project_name[:35].ljust(35)
+
         lines.append("/*--------------------------------*- C++ -*----------------------------------*\\")
         lines.append("| =========                 |                                                 |")
-        lines.append("| \\\\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |")
-        lines.append("|  \\\\    /   O peration     | Version:  v2012                                 |")
-        lines.append("|   \\\\  /    A nd           | Website:  www.openfoam.com                      |")
-        lines.append("|    \\\\/     M anipulation  |                                                 |")
+        lines.append("| \\\\      /  C hin's        | Made with: Chin's BlockMeshAuto                 |")
+        lines.append("|  \\\\    /   H andy         |                                                 |")
+        lines.append("|   \\\\  /    I nterface &   | Project:  {project_name}  |")
+        lines.append("|    \\\\/     N avigation    |                                                 |")
         lines.append("\\*---------------------------------------------------------------------------*/")
         lines.append("FoamFile")
         lines.append("{")
@@ -736,13 +749,15 @@ class TabExport:
         lines.append("(")
 
         for i, block in enumerate(self.mesh_data.hex_blocks.values()):
+            line = ""
+            
             point_refs = block.get('point_refs', [])
             if len(point_refs) != 8:
                 continue
 
             # Translate global point IDs -> 0-based vertex indices
             p = [point_map.get(int(pid), int(pid)) for pid in point_refs]
-            lines.append(f"    hex ({p[0]} {p[1]} {p[2]} {p[3]} {p[4]} {p[5]} {p[6]} {p[7]})")
+            line += f"    hex ({p[0]} {p[1]} {p[2]} {p[3]} {p[4]} {p[5]} {p[6]} {p[7]})"
 
             nx, ny, nz = block.get('divisions', (1, 1, 1))
             grading_type = block.get('grading_type', 'simpleGrading')
@@ -752,13 +767,15 @@ class TabExport:
                 gx = grading_params.get('x', 1.0)
                 gy = grading_params.get('y', 1.0)
                 gz = grading_params.get('z', 1.0)
-                lines.append(f"        ({nx} {ny} {nz})")
-                lines.append(f"        simpleGrading ({gx} {gy} {gz})")
+                line += f"        ({nx} {ny} {nz})"
+                line += f"        simpleGrading ({gx} {gy} {gz})"
             else:
-                lines.append(f"        ({nx} {ny} {nz})")
-                lines.append(f"        {grading_type} (1 1 1)")
+                line += f"        ({nx} {ny} {nz})"
+                line += f"        {grading_type} (1 1 1)"
 
-            lines.append(f"        // Block {i}")
+            line += f"        // Block {i}"
+            
+            lines.append(line)
 
         lines.append(");")
         lines.append("")
@@ -842,8 +859,8 @@ class TabExport:
                 return
         
         filename = filedialog.asksaveasfilename(
-            defaultextension=".dict",
-            filetypes=[("blockMeshDict", "blockMeshDict"), ("Dictionary files", "*.dict"), ("All files", "*.*")],
+            defaultextension="",  # No automatic extension
+            filetypes=[("blockMeshDict", "blockMeshDict"), ("Dictionary files", "*.dict"), ("All files", "*")],
             initialfile="blockMeshDict"
         )
         

@@ -5,6 +5,7 @@ Added: Patch edit mode for normal editing
 Added: Patch coloring mode - colors faces by their assigned patch
 FIXED: Error handling for find_closest on empty canvas
 FIXED: Safe dict access for all face and block data
+FIXED: Camera-relative depth sorting for proper occlusion and face selection
 """
 import tkinter as tk
 import numpy as np
@@ -247,6 +248,37 @@ class HexBlockRenderer:
                 if point_set in self._patch_point_set_map:
                     self._face_to_patch_map[face_id] = self._patch_point_set_map[point_set]
 
+    def _get_camera_position(self):
+        """
+        Calculate the camera position in world space based on current rotation.
+        The camera is positioned along the view direction at a large distance.
+        This allows proper depth sorting from the camera's perspective.
+        """
+        # The view is constructed by rotating the world around the origin
+        # We need to find where the camera is in world space
+
+        # The view direction in view space is (0, 0, 1) - looking down +Z
+        # We need to apply inverse rotations to get the world space direction
+        rad_y = math.radians(self.rotation_y)
+        rad_x = math.radians(self.rotation_x)
+
+        # Start with view direction (0, 0, 1)
+        # Apply inverse rotation Y (rotate by -rotation_y)
+        cos_y, sin_y = math.cos(-rad_y), math.sin(-rad_y)
+        x = sin_y * 1.0  # z component starts as 1
+        z = cos_y * 1.0
+
+        # Apply inverse rotation X (rotate by -rotation_x)
+        cos_x, sin_x = math.cos(-rad_x), math.sin(-rad_x)
+        y = z * sin_x
+        z = z * cos_x
+
+        # The camera is positioned far along this direction
+        camera_distance = 1000.0
+        camera_pos = np.array([x, y, z]) * camera_distance
+
+        return camera_pos
+
     def _rotate_point(self, point):
         """Apply rotation to a 3D point"""
         x, y, z = point
@@ -275,7 +307,7 @@ class HexBlockRenderer:
         return screen_x, screen_y, rotated[2]
 
     def draw(self):
-        """Draw all visible faces - with patch coloring support"""
+        """Draw all visible faces - with patch coloring support and proper camera-relative depth sorting"""
         # If in patch edit mode, don't draw normally
         if self.patch_edit_mode and self.normals_tab:
             self.normals_tab._redraw_canvas()
@@ -294,17 +326,20 @@ class HexBlockRenderer:
             self._draw_no_data_message()
             return
 
-        # Filter visible faces
+        # Calculate camera position in world space for proper depth sorting
+        camera_pos = self._get_camera_position()
+
+        # Filter visible faces and calculate camera-relative depth
         visible_faces = []
         for face in self.all_faces:
             if not face.get('is_visible', False):
                 continue
 
-            projected = []
             vertices = face.get('vertices', [])
             if not vertices:
                 continue
 
+            projected = []
             for vert in vertices:
                 sx, sy, sz = self._project(vert)
                 projected.append((sx, sy, sz))
@@ -312,18 +347,23 @@ class HexBlockRenderer:
             if not projected:
                 continue
 
-            avg_depth = sum(p[2] for p in projected) / len(projected)
+            # Calculate face center in world space
+            face_center = np.mean(vertices, axis=0)
+
+            # Calculate distance from camera to face center (true depth from camera)
+            distance_to_camera = np.linalg.norm(face_center - camera_pos)
 
             visible_faces.append({
                 **face,
                 'projected': projected,
-                'avg_depth': avg_depth
+                'camera_distance': distance_to_camera
             })
 
-        # Sort by depth
-        visible_faces.sort(key=lambda f: f.get('avg_depth', 0), reverse=True)
+        # Sort by camera distance - furthest faces first (painter's algorithm)
+        # This ensures proper occlusion regardless of view angle
+        visible_faces.sort(key=lambda f: f.get('camera_distance', 0), reverse=True)
 
-        # Draw faces
+        # Draw faces back-to-front
         for face in visible_faces:
             face_id = face.get('face_id')
             if face_id is None:
@@ -442,7 +482,7 @@ class HexBlockRenderer:
             pass
 
     def _on_canvas_click(self, event):
-        """FIX: Single canvas click handler using find_closest with error handling"""
+        """FIX: Camera-aware face selection - selects the front-most face at cursor position"""
         # If in patch edit mode, handle differently
         if self.patch_edit_mode and self.normals_tab:
             self._on_patch_edit_click(event, self.normals_tab)
@@ -455,24 +495,55 @@ class HexBlockRenderer:
             if not all_items:
                 return
 
-            # Find which polygon was clicked
-            closest = self.canvas.find_closest(event.x, event.y)
-            if not closest:
-                return
-            item = closest[0]
+            # Find all polygons near the cursor (within a small radius)
+            # This catches faces that might be overlapping at this screen position
+            search_radius = 10
+            items = self.canvas.find_overlapping(
+                event.x - search_radius, event.y - search_radius,
+                event.x + search_radius, event.y + search_radius
+            )
 
-            # Check if this polygon corresponds to a face
-            if item in self._polygon_to_face:
-                face_id = self._polygon_to_face[item]
+            # Filter to only polygons that correspond to faces
+            candidate_faces = []
+            for item in items:
+                if item in self._polygon_to_face:
+                    face_id = self._polygon_to_face[item]
+                    # Find the face data to get its camera distance
+                    for face in self.all_faces:
+                        if face.get('face_id') == face_id:
+                            # Calculate current camera distance for this face
+                            vertices = face.get('vertices', [])
+                            if vertices:
+                                face_center = np.mean(vertices, axis=0)
+                                camera_pos = self._get_camera_position()
+                                distance = np.linalg.norm(face_center - camera_pos)
+                                candidate_faces.append((face_id, distance))
+                            break
 
-                # Toggle selection
-                if face_id in self.selected_faces:
-                    self.selected_faces.remove(face_id)
+            if not candidate_faces:
+                # Fallback to single closest item if no overlapping faces found
+                closest = self.canvas.find_closest(event.x, event.y)
+                if not closest:
+                    return
+                item = closest[0]
+                if item in self._polygon_to_face:
+                    face_id = self._polygon_to_face[item]
+                    candidate_faces = [(face_id, 0)]
                 else:
-                    self.selected_faces.add(face_id)
+                    return
 
-                self.draw()
-                self._notify_selection_change()
+            # Select the face closest to camera (smallest distance)
+            candidate_faces.sort(key=lambda x: x[1])
+            face_id = candidate_faces[0][0]
+
+            # Toggle selection
+            if face_id in self.selected_faces:
+                self.selected_faces.remove(face_id)
+            else:
+                self.selected_faces.add(face_id)
+
+            self.draw()
+            self._notify_selection_change()
         except (IndexError, tk.TclError) as e:
             # IndexError: find_closest returned empty tuple
             # TclError: canvas operation failed
@@ -712,6 +783,9 @@ class HexBlockRenderer:
         # Get set of face IDs in the patch
         patch_face_ids = {f.get('face_id') for f in patch_faces if f.get('face_id') is not None}
 
+        # Calculate camera position for proper sorting
+        camera_pos = self._get_camera_position()
+
         # Separate faces into patch faces and other faces
         patch_faces_render = []
         other_faces_render = []
@@ -732,12 +806,14 @@ class HexBlockRenderer:
             if not projected:
                 continue
 
-            avg_depth = sum(p[2] for p in projected) / len(projected)
+            # Calculate face center in world space for camera-relative depth
+            face_center = np.mean(vertices, axis=0)
+            camera_distance = np.linalg.norm(face_center - camera_pos)
 
             render_data = {
                 **face,
                 'projected': projected,
-                'avg_depth': avg_depth
+                'camera_distance': camera_distance
             }
 
             if face.get('face_id') in patch_face_ids:
@@ -745,9 +821,9 @@ class HexBlockRenderer:
             else:
                 other_faces_render.append(render_data)
 
-        # Sort by depth
-        patch_faces_render.sort(key=lambda f: f.get('avg_depth', 0), reverse=True)
-        other_faces_render.sort(key=lambda f: f.get('avg_depth', 0), reverse=True)
+        # Sort by camera distance for proper occlusion
+        patch_faces_render.sort(key=lambda f: f.get('camera_distance', 0), reverse=True)
+        other_faces_render.sort(key=lambda f: f.get('camera_distance', 0), reverse=True)
 
         # Draw other faces as wireframe (dashed lines)
         for face in other_faces_render:
@@ -879,29 +955,57 @@ class HexBlockRenderer:
             if not all_items:
                 return
 
-            closest = self.canvas.find_closest(event.x, event.y)
-            if not closest:
-                return
-            item = closest[0]
+            # Use camera-aware selection like main click handler
+            search_radius = 10
+            items = self.canvas.find_overlapping(
+                event.x - search_radius, event.y - search_radius,
+                event.x + search_radius, event.y + search_radius
+            )
 
-            if item in self._polygon_to_face:
-                face_id = self._polygon_to_face[item]
+            candidate_faces = []
+            for item in items:
+                if item in self._polygon_to_face:
+                    face_id = self._polygon_to_face[item]
+                    for face in self.all_faces:
+                        if face.get('face_id') == face_id:
+                            vertices = face.get('vertices', [])
+                            if vertices:
+                                face_center = np.mean(vertices, axis=0)
+                                camera_pos = self._get_camera_position()
+                                distance = np.linalg.norm(face_center - camera_pos)
+                                candidate_faces.append((face_id, distance))
+                            break
 
-                # Try to handle in normals tab first (for flip mode)
-                if normals_tab and normals_tab.handle_face_click(face_id):
+            if not candidate_faces:
+                closest = self.canvas.find_closest(event.x, event.y)
+                if not closest:
+                    return
+                item = closest[0]
+                if item in self._polygon_to_face:
+                    face_id = self._polygon_to_face[item]
+                    candidate_faces = [(face_id, 0)]
+                else:
                     return
 
-                # Otherwise toggle selection
-                if face_id in self.selected_faces:
-                    self.selected_faces.remove(face_id)
-                else:
-                    self.selected_faces.add(face_id)
+            # Select closest to camera
+            candidate_faces.sort(key=lambda x: x[1])
+            face_id = candidate_faces[0][0]
 
-                # Redraw
-                if normals_tab and normals_tab.selected_patch_name:
-                    normals_tab._redraw_canvas()
-                else:
-                    self.draw()
+            # Try to handle in normals tab first (for flip mode)
+            if normals_tab and normals_tab.handle_face_click(face_id):
+                return
+
+            # Otherwise toggle selection
+            if face_id in self.selected_faces:
+                self.selected_faces.remove(face_id)
+            else:
+                self.selected_faces.add(face_id)
+
+            # Redraw
+            if normals_tab and normals_tab.selected_patch_name:
+                normals_tab._redraw_canvas()
+            else:
+                self.draw()
         except (IndexError, tk.TclError):
             pass
 

@@ -1,0 +1,1584 @@
+{
+  "Points": {
+    "Point 1": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+    },
+    "Point 2": {
+      "X": 5.0,
+      "Y": 0.0,
+      "Z": 0.0
+    },
+    "Point 3": {
+      "X": 5.0,
+      "Y": 4.0,
+      "Z": 0.0
+    },
+    "Point 4": {
+      "X": 0.0,
+      "Y": 4.0,
+      "Z": 0.0
+    },
+    "Point 5": {
+      "X": 5.0,
+      "Y": 5.0,
+      "Z": 0.0
+    },
+    "Point 6": {
+      "X": 0.0,
+      "Y": 5.0,
+      "Z": 0.0
+    },
+    "Point 7": {
+      "X": 5.0,
+      "Y": 10.0,
+      "Z": 0.0
+    },
+    "Point 8": {
+      "X": 0.0,
+      "Y": 10.0,
+      "Z": 0.0
+    },
+    "Point 9": {
+      "X": 7.0,
+      "Y": 0.0,
+      "Z": 0.0
+    },
+    "Point 10": {
+      "X": 7.0,
+      "Y": 4.0,
+      "Z": 0.0
+    },
+    "Point 11": {
+      "X": 7.0,
+      "Y": 5.0,
+      "Z": 0.0
+    },
+    "Point 12": {
+      "X": 7.0,
+      "Y": 10.0,
+      "Z": 0.0
+    },
+    "Point 13": {
+      "X": 12.0,
+      "Y": 0.0,
+      "Z": 0.0
+    },
+    "Point 14": {
+      "X": 12.0,
+      "Y": 10.0,
+      "Z": 0.0
+    },
+    "Point 15": {
+      "X": 12.0,
+      "Y": 4.0,
+      "Z": 0.0
+    },
+    "Point 16": {
+      "X": 12.0,
+      "Y": 5.0,
+      "Z": 0.0
+    },
+    "Point 17": {
+      "X": 14.0,
+      "Y": 0.0,
+      "Z": 0.0
+    },
+    "Point 18": {
+      "X": 14.0,
+      "Y": 4.0,
+      "Z": 0.0
+    },
+    "Point 19": {
+      "X": 14.0,
+      "Y": 5.0,
+      "Z": 0.0
+    },
+    "Point 20": {
+      "X": 14.0,
+      "Y": 10.0,
+      "Z": 0.0
+    },
+    "Point 21": {
+      "X": 20.0,
+      "Y": 0.0,
+      "Z": 0.0
+    },
+    "Point 22": {
+      "X": 20.0,
+      "Y": 4.0,
+      "Z": 0.0
+    },
+    "Point 23": {
+      "X": 20.0,
+      "Y": 5.0,
+      "Z": 0.0
+    },
+    "Point 24": {
+      "X": 20.0,
+      "Y": 10.0,
+      "Z": 0.0
+    },
+    "Point 25": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 4.0
+    },
+    "Point 26": {
+      "X": 5.0,
+      "Y": 0.0,
+      "Z": 4.0
+    },
+    "Point 27": {
+      "X": 5.0,
+      "Y": 4.0,
+      "Z": 4.0
+    },
+    "Point 28": {
+      "X": 0.0,
+      "Y": 4.0,
+      "Z": 4.0
+    },
+    "Point 29": {
+      "X": 5.0,
+      "Y": 5.0,
+      "Z": 4.0
+    },
+    "Point 30": {
+      "X": 0.0,
+      "Y": 5.0,
+      "Z": 4.0
+    },
+    "Point 31": {
+      "X": 5.0,
+      "Y": 10.0,
+      "Z": 4.0
+    },
+    "Point 32": {
+      "X": 0.0,
+      "Y": 10.0,
+      "Z": 4.0
+    },
+    "Point 33": {
+      "X": 7.0,
+      "Y": 0.0,
+      "Z": 4.0
+    },
+    "Point 34": {
+      "X": 7.0,
+      "Y": 4.0,
+      "Z": 4.0
+    },
+    "Point 35": {
+      "X": 7.0,
+      "Y": 5.0,
+      "Z": 4.0
+    },
+    "Point 36": {
+      "X": 7.0,
+      "Y": 10.0,
+      "Z": 4.0
+    },
+    "Point 37": {
+      "X": 12.0,
+      "Y": 0.0,
+      "Z": 4.0
+    },
+    "Point 38": {
+      "X": 12.0,
+      "Y": 10.0,
+      "Z": 4.0
+    },
+    "Point 39": {
+      "X": 12.0,
+      "Y": 4.0,
+      "Z": 4.0
+    },
+    "Point 40": {
+      "X": 12.0,
+      "Y": 5.0,
+      "Z": 4.0
+    },
+    "Point 41": {
+      "X": 14.0,
+      "Y": 0.0,
+      "Z": 4.0
+    },
+    "Point 42": {
+      "X": 14.0,
+      "Y": 4.0,
+      "Z": 4.0
+    },
+    "Point 43": {
+      "X": 14.0,
+      "Y": 5.0,
+      "Z": 4.0
+    },
+    "Point 44": {
+      "X": 14.0,
+      "Y": 10.0,
+      "Z": 4.0
+    },
+    "Point 45": {
+      "X": 20.0,
+      "Y": 0.0,
+      "Z": 4.0
+    },
+    "Point 46": {
+      "X": 20.0,
+      "Y": 4.0,
+      "Z": 4.0
+    },
+    "Point 47": {
+      "X": 20.0,
+      "Y": 5.0,
+      "Z": 4.0
+    },
+    "Point 48": {
+      "X": 20.0,
+      "Y": 10.0,
+      "Z": 4.0
+    },
+    "Point 49": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 6.0
+    },
+    "Point 50": {
+      "X": 5.0,
+      "Y": 0.0,
+      "Z": 6.0
+    },
+    "Point 51": {
+      "X": 5.0,
+      "Y": 4.0,
+      "Z": 6.0
+    },
+    "Point 52": {
+      "X": 0.0,
+      "Y": 4.0,
+      "Z": 6.0
+    },
+    "Point 53": {
+      "X": 5.0,
+      "Y": 5.0,
+      "Z": 6.0
+    },
+    "Point 54": {
+      "X": 0.0,
+      "Y": 5.0,
+      "Z": 6.0
+    },
+    "Point 55": {
+      "X": 5.0,
+      "Y": 10.0,
+      "Z": 6.0
+    },
+    "Point 56": {
+      "X": 0.0,
+      "Y": 10.0,
+      "Z": 6.0
+    },
+    "Point 57": {
+      "X": 7.0,
+      "Y": 0.0,
+      "Z": 6.0
+    },
+    "Point 58": {
+      "X": 7.0,
+      "Y": 4.0,
+      "Z": 6.0
+    },
+    "Point 59": {
+      "X": 7.0,
+      "Y": 5.0,
+      "Z": 6.0
+    },
+    "Point 60": {
+      "X": 7.0,
+      "Y": 10.0,
+      "Z": 6.0
+    },
+    "Point 61": {
+      "X": 12.0,
+      "Y": 0.0,
+      "Z": 6.0
+    },
+    "Point 62": {
+      "X": 12.0,
+      "Y": 10.0,
+      "Z": 6.0
+    },
+    "Point 63": {
+      "X": 12.0,
+      "Y": 4.0,
+      "Z": 6.0
+    },
+    "Point 64": {
+      "X": 12.0,
+      "Y": 5.0,
+      "Z": 6.0
+    },
+    "Point 65": {
+      "X": 14.0,
+      "Y": 0.0,
+      "Z": 6.0
+    },
+    "Point 66": {
+      "X": 14.0,
+      "Y": 4.0,
+      "Z": 6.0
+    },
+    "Point 67": {
+      "X": 14.0,
+      "Y": 5.0,
+      "Z": 6.0
+    },
+    "Point 68": {
+      "X": 14.0,
+      "Y": 10.0,
+      "Z": 6.0
+    },
+    "Point 69": {
+      "X": 20.0,
+      "Y": 0.0,
+      "Z": 6.0
+    },
+    "Point 70": {
+      "X": 20.0,
+      "Y": 4.0,
+      "Z": 6.0
+    },
+    "Point 71": {
+      "X": 20.0,
+      "Y": 5.0,
+      "Z": 6.0
+    },
+    "Point 72": {
+      "X": 20.0,
+      "Y": 10.0,
+      "Z": 6.0
+    },
+    "Point 73": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 10.0
+    },
+    "Point 74": {
+      "X": 5.0,
+      "Y": 0.0,
+      "Z": 10.0
+    },
+    "Point 75": {
+      "X": 5.0,
+      "Y": 4.0,
+      "Z": 10.0
+    },
+    "Point 76": {
+      "X": 0.0,
+      "Y": 4.0,
+      "Z": 10.0
+    },
+    "Point 77": {
+      "X": 5.0,
+      "Y": 5.0,
+      "Z": 10.0
+    },
+    "Point 78": {
+      "X": 0.0,
+      "Y": 5.0,
+      "Z": 10.0
+    },
+    "Point 79": {
+      "X": 5.0,
+      "Y": 10.0,
+      "Z": 10.0
+    },
+    "Point 80": {
+      "X": 0.0,
+      "Y": 10.0,
+      "Z": 10.0
+    },
+    "Point 81": {
+      "X": 7.0,
+      "Y": 0.0,
+      "Z": 10.0
+    },
+    "Point 82": {
+      "X": 7.0,
+      "Y": 4.0,
+      "Z": 10.0
+    },
+    "Point 83": {
+      "X": 7.0,
+      "Y": 5.0,
+      "Z": 10.0
+    },
+    "Point 84": {
+      "X": 7.0,
+      "Y": 10.0,
+      "Z": 10.0
+    },
+    "Point 85": {
+      "X": 12.0,
+      "Y": 0.0,
+      "Z": 10.0
+    },
+    "Point 86": {
+      "X": 12.0,
+      "Y": 10.0,
+      "Z": 10.0
+    },
+    "Point 87": {
+      "X": 12.0,
+      "Y": 4.0,
+      "Z": 10.0
+    },
+    "Point 88": {
+      "X": 12.0,
+      "Y": 5.0,
+      "Z": 10.0
+    },
+    "Point 89": {
+      "X": 14.0,
+      "Y": 0.0,
+      "Z": 10.0
+    },
+    "Point 90": {
+      "X": 14.0,
+      "Y": 4.0,
+      "Z": 10.0
+    },
+    "Point 91": {
+      "X": 14.0,
+      "Y": 5.0,
+      "Z": 10.0
+    },
+    "Point 92": {
+      "X": 14.0,
+      "Y": 10.0,
+      "Z": 10.0
+    },
+    "Point 93": {
+      "X": 20.0,
+      "Y": 0.0,
+      "Z": 10.0
+    },
+    "Point 94": {
+      "X": 20.0,
+      "Y": 4.0,
+      "Z": 10.0
+    },
+    "Point 95": {
+      "X": 20.0,
+      "Y": 5.0,
+      "Z": 10.0
+    },
+    "Point 96": {
+      "X": 20.0,
+      "Y": 10.0,
+      "Z": 10.0
+    }
+  },
+  "Layers": {
+    "Layer 0": {
+      "Points (Ref)": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24"
+    },
+    "Layer 1": {
+      "Points (Ref)": "25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48"
+    },
+    "Layer 2": {
+      "Points (Ref)": "49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72"
+    },
+    "Layer 3": {
+      "Points (Ref)": "73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96"
+    }
+  },
+  "Connections": {
+    "Connection 1": {
+      "Point 1": 1,
+      "Point 2": 2
+    },
+    "Connection 2": {
+      "Point 1": 2,
+      "Point 2": 3
+    },
+    "Connection 3": {
+      "Point 1": 3,
+      "Point 2": 4
+    },
+    "Connection 4": {
+      "Point 1": 1,
+      "Point 2": 4
+    },
+    "Connection 5": {
+      "Point 1": 4,
+      "Point 2": 6
+    },
+    "Connection 6": {
+      "Point 1": 5,
+      "Point 2": 6
+    },
+    "Connection 7": {
+      "Point 1": 3,
+      "Point 2": 5
+    },
+    "Connection 8": {
+      "Point 1": 3,
+      "Point 2": 10
+    },
+    "Connection 9": {
+      "Point 1": 10,
+      "Point 2": 11
+    },
+    "Connection 10": {
+      "Point 1": 5,
+      "Point 2": 11
+    },
+    "Connection 11": {
+      "Point 1": 5,
+      "Point 2": 7
+    },
+    "Connection 12": {
+      "Point 1": 7,
+      "Point 2": 8
+    },
+    "Connection 13": {
+      "Point 1": 6,
+      "Point 2": 8
+    },
+    "Connection 14": {
+      "Point 1": 11,
+      "Point 2": 12
+    },
+    "Connection 15": {
+      "Point 1": 7,
+      "Point 2": 12
+    },
+    "Connection 16": {
+      "Point 1": 9,
+      "Point 2": 10
+    },
+    "Connection 17": {
+      "Point 1": 2,
+      "Point 2": 9
+    },
+    "Connection 18": {
+      "Point 1": 9,
+      "Point 2": 13
+    },
+    "Connection 19": {
+      "Point 1": 13,
+      "Point 2": 17
+    },
+    "Connection 20": {
+      "Point 1": 17,
+      "Point 2": 21
+    },
+    "Connection 21": {
+      "Point 1": 21,
+      "Point 2": 22
+    },
+    "Connection 22": {
+      "Point 1": 18,
+      "Point 2": 22
+    },
+    "Connection 23": {
+      "Point 1": 15,
+      "Point 2": 18
+    },
+    "Connection 24": {
+      "Point 1": 10,
+      "Point 2": 15
+    },
+    "Connection 25": {
+      "Point 1": 13,
+      "Point 2": 15
+    },
+    "Connection 26": {
+      "Point 1": 17,
+      "Point 2": 18
+    },
+    "Connection 27": {
+      "Point 1": 18,
+      "Point 2": 19
+    },
+    "Connection 28": {
+      "Point 1": 15,
+      "Point 2": 16
+    },
+    "Connection 29": {
+      "Point 1": 11,
+      "Point 2": 16
+    },
+    "Connection 30": {
+      "Point 1": 16,
+      "Point 2": 19
+    },
+    "Connection 31": {
+      "Point 1": 19,
+      "Point 2": 23
+    },
+    "Connection 32": {
+      "Point 1": 22,
+      "Point 2": 23
+    },
+    "Connection 33": {
+      "Point 1": 23,
+      "Point 2": 24
+    },
+    "Connection 34": {
+      "Point 1": 20,
+      "Point 2": 24
+    },
+    "Connection 35": {
+      "Point 1": 19,
+      "Point 2": 20
+    },
+    "Connection 36": {
+      "Point 1": 14,
+      "Point 2": 16
+    },
+    "Connection 37": {
+      "Point 1": 14,
+      "Point 2": 20
+    },
+    "Connection 38": {
+      "Point 1": 12,
+      "Point 2": 14
+    },
+    "Connection 39": {
+      "Point 1": 1,
+      "Point 2": 25
+    },
+    "Connection 40": {
+      "Point 1": 2,
+      "Point 2": 26
+    },
+    "Connection 41": {
+      "Point 1": 3,
+      "Point 2": 27
+    },
+    "Connection 42": {
+      "Point 1": 4,
+      "Point 2": 28
+    },
+    "Connection 43": {
+      "Point 1": 5,
+      "Point 2": 29
+    },
+    "Connection 44": {
+      "Point 1": 6,
+      "Point 2": 30
+    },
+    "Connection 45": {
+      "Point 1": 7,
+      "Point 2": 31
+    },
+    "Connection 46": {
+      "Point 1": 8,
+      "Point 2": 32
+    },
+    "Connection 47": {
+      "Point 1": 9,
+      "Point 2": 33
+    },
+    "Connection 48": {
+      "Point 1": 10,
+      "Point 2": 34
+    },
+    "Connection 49": {
+      "Point 1": 11,
+      "Point 2": 35
+    },
+    "Connection 50": {
+      "Point 1": 12,
+      "Point 2": 36
+    },
+    "Connection 51": {
+      "Point 1": 13,
+      "Point 2": 37
+    },
+    "Connection 52": {
+      "Point 1": 14,
+      "Point 2": 38
+    },
+    "Connection 53": {
+      "Point 1": 15,
+      "Point 2": 39
+    },
+    "Connection 54": {
+      "Point 1": 16,
+      "Point 2": 40
+    },
+    "Connection 55": {
+      "Point 1": 17,
+      "Point 2": 41
+    },
+    "Connection 56": {
+      "Point 1": 18,
+      "Point 2": 42
+    },
+    "Connection 57": {
+      "Point 1": 19,
+      "Point 2": 43
+    },
+    "Connection 58": {
+      "Point 1": 20,
+      "Point 2": 44
+    },
+    "Connection 59": {
+      "Point 1": 21,
+      "Point 2": 45
+    },
+    "Connection 60": {
+      "Point 1": 22,
+      "Point 2": 46
+    },
+    "Connection 61": {
+      "Point 1": 23,
+      "Point 2": 47
+    },
+    "Connection 62": {
+      "Point 1": 24,
+      "Point 2": 48
+    },
+    "Connection 63": {
+      "Point 1": 25,
+      "Point 2": 26
+    },
+    "Connection 64": {
+      "Point 1": 26,
+      "Point 2": 27
+    },
+    "Connection 65": {
+      "Point 1": 27,
+      "Point 2": 28
+    },
+    "Connection 66": {
+      "Point 1": 25,
+      "Point 2": 28
+    },
+    "Connection 67": {
+      "Point 1": 28,
+      "Point 2": 30
+    },
+    "Connection 68": {
+      "Point 1": 29,
+      "Point 2": 30
+    },
+    "Connection 69": {
+      "Point 1": 27,
+      "Point 2": 29
+    },
+    "Connection 70": {
+      "Point 1": 27,
+      "Point 2": 34
+    },
+    "Connection 71": {
+      "Point 1": 34,
+      "Point 2": 35
+    },
+    "Connection 72": {
+      "Point 1": 29,
+      "Point 2": 35
+    },
+    "Connection 73": {
+      "Point 1": 29,
+      "Point 2": 31
+    },
+    "Connection 74": {
+      "Point 1": 31,
+      "Point 2": 32
+    },
+    "Connection 75": {
+      "Point 1": 30,
+      "Point 2": 32
+    },
+    "Connection 76": {
+      "Point 1": 35,
+      "Point 2": 36
+    },
+    "Connection 77": {
+      "Point 1": 31,
+      "Point 2": 36
+    },
+    "Connection 78": {
+      "Point 1": 33,
+      "Point 2": 34
+    },
+    "Connection 79": {
+      "Point 1": 26,
+      "Point 2": 33
+    },
+    "Connection 80": {
+      "Point 1": 33,
+      "Point 2": 37
+    },
+    "Connection 81": {
+      "Point 1": 37,
+      "Point 2": 41
+    },
+    "Connection 82": {
+      "Point 1": 41,
+      "Point 2": 45
+    },
+    "Connection 83": {
+      "Point 1": 45,
+      "Point 2": 46
+    },
+    "Connection 84": {
+      "Point 1": 42,
+      "Point 2": 46
+    },
+    "Connection 85": {
+      "Point 1": 39,
+      "Point 2": 42
+    },
+    "Connection 86": {
+      "Point 1": 34,
+      "Point 2": 39
+    },
+    "Connection 87": {
+      "Point 1": 37,
+      "Point 2": 39
+    },
+    "Connection 88": {
+      "Point 1": 41,
+      "Point 2": 42
+    },
+    "Connection 89": {
+      "Point 1": 42,
+      "Point 2": 43
+    },
+    "Connection 90": {
+      "Point 1": 39,
+      "Point 2": 40
+    },
+    "Connection 91": {
+      "Point 1": 35,
+      "Point 2": 40
+    },
+    "Connection 92": {
+      "Point 1": 40,
+      "Point 2": 43
+    },
+    "Connection 93": {
+      "Point 1": 43,
+      "Point 2": 47
+    },
+    "Connection 94": {
+      "Point 1": 46,
+      "Point 2": 47
+    },
+    "Connection 95": {
+      "Point 1": 47,
+      "Point 2": 48
+    },
+    "Connection 96": {
+      "Point 1": 44,
+      "Point 2": 48
+    },
+    "Connection 97": {
+      "Point 1": 43,
+      "Point 2": 44
+    },
+    "Connection 98": {
+      "Point 1": 38,
+      "Point 2": 40
+    },
+    "Connection 99": {
+      "Point 1": 38,
+      "Point 2": 44
+    },
+    "Connection 100": {
+      "Point 1": 36,
+      "Point 2": 38
+    },
+    "Connection 101": {
+      "Point 1": 25,
+      "Point 2": 49
+    },
+    "Connection 102": {
+      "Point 1": 26,
+      "Point 2": 50
+    },
+    "Connection 103": {
+      "Point 1": 27,
+      "Point 2": 51
+    },
+    "Connection 104": {
+      "Point 1": 28,
+      "Point 2": 52
+    },
+    "Connection 105": {
+      "Point 1": 29,
+      "Point 2": 53
+    },
+    "Connection 106": {
+      "Point 1": 30,
+      "Point 2": 54
+    },
+    "Connection 107": {
+      "Point 1": 31,
+      "Point 2": 55
+    },
+    "Connection 108": {
+      "Point 1": 32,
+      "Point 2": 56
+    },
+    "Connection 109": {
+      "Point 1": 33,
+      "Point 2": 57
+    },
+    "Connection 110": {
+      "Point 1": 34,
+      "Point 2": 58
+    },
+    "Connection 111": {
+      "Point 1": 35,
+      "Point 2": 59
+    },
+    "Connection 112": {
+      "Point 1": 36,
+      "Point 2": 60
+    },
+    "Connection 113": {
+      "Point 1": 37,
+      "Point 2": 61
+    },
+    "Connection 114": {
+      "Point 1": 38,
+      "Point 2": 62
+    },
+    "Connection 115": {
+      "Point 1": 39,
+      "Point 2": 63
+    },
+    "Connection 116": {
+      "Point 1": 40,
+      "Point 2": 64
+    },
+    "Connection 117": {
+      "Point 1": 41,
+      "Point 2": 65
+    },
+    "Connection 118": {
+      "Point 1": 42,
+      "Point 2": 66
+    },
+    "Connection 119": {
+      "Point 1": 43,
+      "Point 2": 67
+    },
+    "Connection 120": {
+      "Point 1": 44,
+      "Point 2": 68
+    },
+    "Connection 121": {
+      "Point 1": 45,
+      "Point 2": 69
+    },
+    "Connection 122": {
+      "Point 1": 46,
+      "Point 2": 70
+    },
+    "Connection 123": {
+      "Point 1": 47,
+      "Point 2": 71
+    },
+    "Connection 124": {
+      "Point 1": 48,
+      "Point 2": 72
+    },
+    "Connection 125": {
+      "Point 1": 49,
+      "Point 2": 50
+    },
+    "Connection 126": {
+      "Point 1": 50,
+      "Point 2": 51
+    },
+    "Connection 127": {
+      "Point 1": 51,
+      "Point 2": 52
+    },
+    "Connection 128": {
+      "Point 1": 49,
+      "Point 2": 52
+    },
+    "Connection 129": {
+      "Point 1": 52,
+      "Point 2": 54
+    },
+    "Connection 130": {
+      "Point 1": 53,
+      "Point 2": 54
+    },
+    "Connection 131": {
+      "Point 1": 51,
+      "Point 2": 53
+    },
+    "Connection 132": {
+      "Point 1": 51,
+      "Point 2": 58
+    },
+    "Connection 133": {
+      "Point 1": 58,
+      "Point 2": 59
+    },
+    "Connection 134": {
+      "Point 1": 53,
+      "Point 2": 59
+    },
+    "Connection 135": {
+      "Point 1": 53,
+      "Point 2": 55
+    },
+    "Connection 136": {
+      "Point 1": 55,
+      "Point 2": 56
+    },
+    "Connection 137": {
+      "Point 1": 54,
+      "Point 2": 56
+    },
+    "Connection 138": {
+      "Point 1": 59,
+      "Point 2": 60
+    },
+    "Connection 139": {
+      "Point 1": 55,
+      "Point 2": 60
+    },
+    "Connection 140": {
+      "Point 1": 57,
+      "Point 2": 58
+    },
+    "Connection 141": {
+      "Point 1": 50,
+      "Point 2": 57
+    },
+    "Connection 142": {
+      "Point 1": 57,
+      "Point 2": 61
+    },
+    "Connection 143": {
+      "Point 1": 61,
+      "Point 2": 65
+    },
+    "Connection 144": {
+      "Point 1": 65,
+      "Point 2": 69
+    },
+    "Connection 145": {
+      "Point 1": 69,
+      "Point 2": 70
+    },
+    "Connection 146": {
+      "Point 1": 66,
+      "Point 2": 70
+    },
+    "Connection 147": {
+      "Point 1": 63,
+      "Point 2": 66
+    },
+    "Connection 148": {
+      "Point 1": 58,
+      "Point 2": 63
+    },
+    "Connection 149": {
+      "Point 1": 61,
+      "Point 2": 63
+    },
+    "Connection 150": {
+      "Point 1": 65,
+      "Point 2": 66
+    },
+    "Connection 151": {
+      "Point 1": 66,
+      "Point 2": 67
+    },
+    "Connection 152": {
+      "Point 1": 63,
+      "Point 2": 64
+    },
+    "Connection 153": {
+      "Point 1": 59,
+      "Point 2": 64
+    },
+    "Connection 154": {
+      "Point 1": 64,
+      "Point 2": 67
+    },
+    "Connection 155": {
+      "Point 1": 67,
+      "Point 2": 71
+    },
+    "Connection 156": {
+      "Point 1": 70,
+      "Point 2": 71
+    },
+    "Connection 157": {
+      "Point 1": 71,
+      "Point 2": 72
+    },
+    "Connection 158": {
+      "Point 1": 68,
+      "Point 2": 72
+    },
+    "Connection 159": {
+      "Point 1": 67,
+      "Point 2": 68
+    },
+    "Connection 160": {
+      "Point 1": 62,
+      "Point 2": 64
+    },
+    "Connection 161": {
+      "Point 1": 62,
+      "Point 2": 68
+    },
+    "Connection 162": {
+      "Point 1": 60,
+      "Point 2": 62
+    },
+    "Connection 163": {
+      "Point 1": 49,
+      "Point 2": 73
+    },
+    "Connection 164": {
+      "Point 1": 50,
+      "Point 2": 74
+    },
+    "Connection 165": {
+      "Point 1": 51,
+      "Point 2": 75
+    },
+    "Connection 166": {
+      "Point 1": 52,
+      "Point 2": 76
+    },
+    "Connection 167": {
+      "Point 1": 53,
+      "Point 2": 77
+    },
+    "Connection 168": {
+      "Point 1": 54,
+      "Point 2": 78
+    },
+    "Connection 169": {
+      "Point 1": 55,
+      "Point 2": 79
+    },
+    "Connection 170": {
+      "Point 1": 56,
+      "Point 2": 80
+    },
+    "Connection 171": {
+      "Point 1": 57,
+      "Point 2": 81
+    },
+    "Connection 172": {
+      "Point 1": 58,
+      "Point 2": 82
+    },
+    "Connection 173": {
+      "Point 1": 59,
+      "Point 2": 83
+    },
+    "Connection 174": {
+      "Point 1": 60,
+      "Point 2": 84
+    },
+    "Connection 175": {
+      "Point 1": 61,
+      "Point 2": 85
+    },
+    "Connection 176": {
+      "Point 1": 62,
+      "Point 2": 86
+    },
+    "Connection 177": {
+      "Point 1": 63,
+      "Point 2": 87
+    },
+    "Connection 178": {
+      "Point 1": 64,
+      "Point 2": 88
+    },
+    "Connection 179": {
+      "Point 1": 65,
+      "Point 2": 89
+    },
+    "Connection 180": {
+      "Point 1": 66,
+      "Point 2": 90
+    },
+    "Connection 181": {
+      "Point 1": 67,
+      "Point 2": 91
+    },
+    "Connection 182": {
+      "Point 1": 68,
+      "Point 2": 92
+    },
+    "Connection 183": {
+      "Point 1": 69,
+      "Point 2": 93
+    },
+    "Connection 184": {
+      "Point 1": 70,
+      "Point 2": 94
+    },
+    "Connection 185": {
+      "Point 1": 71,
+      "Point 2": 95
+    },
+    "Connection 186": {
+      "Point 1": 72,
+      "Point 2": 96
+    },
+    "Connection 187": {
+      "Point 1": 73,
+      "Point 2": 74
+    },
+    "Connection 188": {
+      "Point 1": 74,
+      "Point 2": 75
+    },
+    "Connection 189": {
+      "Point 1": 75,
+      "Point 2": 76
+    },
+    "Connection 190": {
+      "Point 1": 73,
+      "Point 2": 76
+    },
+    "Connection 191": {
+      "Point 1": 76,
+      "Point 2": 78
+    },
+    "Connection 192": {
+      "Point 1": 77,
+      "Point 2": 78
+    },
+    "Connection 193": {
+      "Point 1": 75,
+      "Point 2": 77
+    },
+    "Connection 194": {
+      "Point 1": 75,
+      "Point 2": 82
+    },
+    "Connection 195": {
+      "Point 1": 82,
+      "Point 2": 83
+    },
+    "Connection 196": {
+      "Point 1": 77,
+      "Point 2": 83
+    },
+    "Connection 197": {
+      "Point 1": 77,
+      "Point 2": 79
+    },
+    "Connection 198": {
+      "Point 1": 79,
+      "Point 2": 80
+    },
+    "Connection 199": {
+      "Point 1": 78,
+      "Point 2": 80
+    },
+    "Connection 200": {
+      "Point 1": 83,
+      "Point 2": 84
+    },
+    "Connection 201": {
+      "Point 1": 79,
+      "Point 2": 84
+    },
+    "Connection 202": {
+      "Point 1": 81,
+      "Point 2": 82
+    },
+    "Connection 203": {
+      "Point 1": 74,
+      "Point 2": 81
+    },
+    "Connection 204": {
+      "Point 1": 81,
+      "Point 2": 85
+    },
+    "Connection 205": {
+      "Point 1": 85,
+      "Point 2": 89
+    },
+    "Connection 206": {
+      "Point 1": 89,
+      "Point 2": 93
+    },
+    "Connection 207": {
+      "Point 1": 93,
+      "Point 2": 94
+    },
+    "Connection 208": {
+      "Point 1": 90,
+      "Point 2": 94
+    },
+    "Connection 209": {
+      "Point 1": 87,
+      "Point 2": 90
+    },
+    "Connection 210": {
+      "Point 1": 82,
+      "Point 2": 87
+    },
+    "Connection 211": {
+      "Point 1": 85,
+      "Point 2": 87
+    },
+    "Connection 212": {
+      "Point 1": 89,
+      "Point 2": 90
+    },
+    "Connection 213": {
+      "Point 1": 90,
+      "Point 2": 91
+    },
+    "Connection 214": {
+      "Point 1": 87,
+      "Point 2": 88
+    },
+    "Connection 215": {
+      "Point 1": 83,
+      "Point 2": 88
+    },
+    "Connection 216": {
+      "Point 1": 88,
+      "Point 2": 91
+    },
+    "Connection 217": {
+      "Point 1": 91,
+      "Point 2": 95
+    },
+    "Connection 218": {
+      "Point 1": 94,
+      "Point 2": 95
+    },
+    "Connection 219": {
+      "Point 1": 95,
+      "Point 2": 96
+    },
+    "Connection 220": {
+      "Point 1": 92,
+      "Point 2": 96
+    },
+    "Connection 221": {
+      "Point 1": 91,
+      "Point 2": 92
+    },
+    "Connection 222": {
+      "Point 1": 86,
+      "Point 2": 88
+    },
+    "Connection 223": {
+      "Point 1": 86,
+      "Point 2": 92
+    },
+    "Connection 224": {
+      "Point 1": 84,
+      "Point 2": 86
+    }
+  },
+  "Edges": {},
+  "Hexes": {
+    "Hex 1": {
+      "Points": "Point 1, Point 2, Point 3, Point 4"
+    },
+    "Hex 2": {
+      "Points": "Point 1, Point 2, Point 3, Point 4, Point 25, Point 26, Point 27, Point 28"
+    },
+    "Hex 3": {
+      "Points": "Point 4, Point 3, Point 5, Point 6, Point 28, Point 27, Point 29, Point 30"
+    },
+    "Hex 4": {
+      "Points": "Point 6, Point 5, Point 7, Point 8, Point 30, Point 29, Point 31, Point 32"
+    },
+    "Hex 5": {
+      "Points": "Point 2, Point 9, Point 10, Point 3, Point 26, Point 33, Point 34, Point 27"
+    },
+    "Hex 6": {
+      "Points": "Point 3, Point 10, Point 11, Point 5, Point 27, Point 34, Point 35, Point 29"
+    },
+    "Hex 7": {
+      "Points": "Point 5, Point 11, Point 12, Point 7, Point 29, Point 35, Point 36, Point 31"
+    },
+    "Hex 8": {
+      "Points": "Point 9, Point 13, Point 15, Point 10, Point 33, Point 37, Point 39, Point 34"
+    },
+    "Hex 9": {
+      "Points": "Point 10, Point 15, Point 16, Point 11, Point 34, Point 39, Point 40, Point 35"
+    },
+    "Hex 10": {
+      "Points": "Point 11, Point 16, Point 14, Point 12, Point 35, Point 40, Point 38, Point 36"
+    },
+    "Hex 11": {
+      "Points": "Point 13, Point 17, Point 18, Point 15, Point 37, Point 41, Point 42, Point 39"
+    },
+    "Hex 12": {
+      "Points": "Point 18, Point 15, Point 16, Point 19, Point 42, Point 39, Point 40, Point 43"
+    },
+    "Hex 13": {
+      "Points": "Point 16, Point 19, Point 20, Point 14, Point 40, Point 43, Point 44, Point 38"
+    },
+    "Hex 14": {
+      "Points": "Point 17, Point 21, Point 22, Point 18, Point 41, Point 45, Point 46, Point 42"
+    },
+    "Hex 15": {
+      "Points": "Point 18, Point 22, Point 23, Point 19, Point 42, Point 46, Point 47, Point 43"
+    },
+    "Hex 16": {
+      "Points": "Point 19, Point 23, Point 24, Point 20, Point 43, Point 47, Point 48, Point 44"
+    },
+    "Hex 17": {
+      "Points": "Point 25, Point 26, Point 27, Point 28, Point 49, Point 50, Point 51, Point 52"
+    },
+    "Hex 18": {
+      "Points": "Point 28, Point 27, Point 29, Point 30, Point 52, Point 51, Point 53, Point 54"
+    },
+    "Hex 19": {
+      "Points": "Point 30, Point 29, Point 31, Point 32, Point 54, Point 53, Point 55, Point 56"
+    },
+    "Hex 20": {
+      "Points": "Point 33, Point 37, Point 39, Point 34, Point 57, Point 61, Point 63, Point 58"
+    },
+    "Hex 21": {
+      "Points": "Point 34, Point 39, Point 40, Point 35, Point 58, Point 63, Point 64, Point 59"
+    },
+    "Hex 22": {
+      "Points": "Point 35, Point 40, Point 38, Point 36, Point 59, Point 64, Point 62, Point 60"
+    },
+    "Hex 23": {
+      "Points": "Point 41, Point 45, Point 46, Point 42, Point 65, Point 69, Point 70, Point 66"
+    },
+    "Hex 24": {
+      "Points": "Point 42, Point 46, Point 47, Point 43, Point 66, Point 70, Point 71, Point 67"
+    },
+    "Hex 25": {
+      "Points": "Point 43, Point 47, Point 48, Point 44, Point 67, Point 71, Point 72, Point 68"
+    },
+    "Hex 26": {
+      "Points": "Point 49, Point 50, Point 51, Point 52, Point 73, Point 74, Point 75, Point 76"
+    },
+    "Hex 27": {
+      "Points": "Point 52, Point 51, Point 53, Point 54, Point 76, Point 75, Point 77, Point 78"
+    },
+    "Hex 28": {
+      "Points": "Point 54, Point 53, Point 55, Point 56, Point 78, Point 77, Point 79, Point 80"
+    },
+    "Hex 29": {
+      "Points": "Point 50, Point 57, Point 58, Point 51, Point 74, Point 81, Point 82, Point 75"
+    },
+    "Hex 30": {
+      "Points": "Point 51, Point 58, Point 59, Point 53, Point 75, Point 82, Point 83, Point 77"
+    },
+    "Hex 31": {
+      "Points": "Point 53, Point 59, Point 60, Point 55, Point 77, Point 83, Point 84, Point 79"
+    },
+    "Hex 32": {
+      "Points": "Point 57, Point 61, Point 63, Point 58, Point 81, Point 85, Point 87, Point 82"
+    },
+    "Hex 33": {
+      "Points": "Point 58, Point 63, Point 64, Point 59, Point 82, Point 87, Point 88, Point 83"
+    },
+    "Hex 34": {
+      "Points": "Point 59, Point 64, Point 62, Point 60, Point 83, Point 88, Point 86, Point 84"
+    },
+    "Hex 35": {
+      "Points": "Point 61, Point 65, Point 66, Point 63, Point 85, Point 89, Point 90, Point 87"
+    },
+    "Hex 36": {
+      "Points": "Point 63, Point 66, Point 67, Point 64, Point 87, Point 90, Point 91, Point 88"
+    },
+    "Hex 37": {
+      "Points": "Point 64, Point 67, Point 68, Point 62, Point 88, Point 91, Point 92, Point 86"
+    },
+    "Hex 38": {
+      "Points": "Point 65, Point 69, Point 70, Point 66, Point 89, Point 93, Point 94, Point 90"
+    },
+    "Hex 39": {
+      "Points": "Point 66, Point 70, Point 71, Point 67, Point 90, Point 94, Point 95, Point 91"
+    },
+    "Hex 40": {
+      "Points": "Point 67, Point 71, Point 72, Point 68, Point 91, Point 95, Point 96, Point 92"
+    }
+  },
+  "Patches": {
+    "airInlet": {
+      "type": "patch",
+      "Points": "6 30 32 8, 30 54 56 32, 54 78 80 56",
+      "Normal": 1
+    },
+    "waterInlet": {
+      "type": "patch",
+      "Points": "4 28 30 6, 28 52 54 30, 52 76 78 54",
+      "Normal": 1
+    },
+    "waterInletAsWall": {
+      "type": "wall",
+      "Points": "49 73 76 52, 1 25 28 4, 25 49 52 28",
+      "Normal": 1
+    },
+    "waterOutletAsWall": {
+      "type": "wall",
+      "Points": "45 46 70 69, 21 22 46 45, 69 70 94 93",
+      "Normal": 1
+    },
+    "waterOutlet": {
+      "type": "wall",
+      "Points": "46 47 71 70, 22 23 47 46, 70 71 95 94",
+      "Normal": 1
+    },
+    "airOutlet": {
+      "type": "patch",
+      "Points": "23 24 48 47, 71 72 96 95, 47 48 72 71",
+      "Normal": 1
+    },
+    "obstacle2": {
+      "type": "patch",
+      "Points": "41 65 66 42, 40 43 44 38, 61 63 66 65, 42 66 67 43, 63 64 67 66, 43 67 68 44, 37 39 63 61, 64 62 68 67, 39 40 64 63, 40 38 62 64, 37 41 42 39, 42 39 40 43",
+      "Normal": 1
+    },
+    "obstacle1": {
+      "type": "patch",
+      "Points": "50 51 58 57, 27 29 53 51, 51 53 59 58, 29 31 55 53, 29 35 36 31, 53 55 60 59, 33 57 58 34, 26 33 34 27, 34 58 59 35, 27 34 35 29, 35 59 60 36, 26 27 51 50",
+      "Normal": 1
+    },
+    "top": {
+      "type": "wall",
+      "Points": "7 31 36 12, 60 84 86 62, 14 38 44 20, 68 92 96 72, 32 56 55 31, 44 68 72 48, 8 32 31 7, 55 79 84 60, 12 36 38 14, 62 86 92 68, 20 44 48 24, 36 60 62 38, 56 80 79 55",
+      "Normal": 1
+    },
+    "bottom": {
+      "type": "wall",
+      "Points": "41 45 69 65, 1 2 26 25, 50 57 81 74, 9 13 37 33, 61 65 89 85, 17 21 45 41, 33 37 61 57, 49 50 74 73, 2 9 33 26, 57 61 85 81, 13 17 41 37, 65 69 93 89, 25 26 50 49",
+      "Normal": 1
+    },
+    "sideWalls": {
+      "type": "wall",
+      "Points": "1 4 3 2, 83 88 86 84, 16 14 20 19, 4 6 5 3, 85 89 90 87, 17 18 22 21, 6 8 7 5, 87 90 91 88, 18 19 23 22, 73 74 75 76, 2 3 10 9, 88 91 92 86, 19 20 24 23, 76 75 77 78, 3 5 11 10, 89 93 94 90, 78 77 79 80, 5 7 12 11, 90 94 95 91, 74 81 82 75, 9 10 15 13, 91 95 96 92, 75 82 83 77, 10 11 16 15, 77 83 84 79, 11 12 14 16, 81 85 87 82, 13 15 18 17, 82 87 88 83, 18 19 16 15",
+      "Normal": 1
+    }
+  },
+  "Specs": {
+    "sketch_plane": "XY",
+    "project_name": "pillarSeperate",
+    "project_description": "",
+    "unit_system": "m",
+    "unit_sci_exponent": "0",
+    "scale": 1.0
+  }
+}

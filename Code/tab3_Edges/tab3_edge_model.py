@@ -91,8 +91,8 @@ class EdgeModel:
             return f"({p[0]:.2f}, {p[1]:.2f}, {p[2]:.2f})"
 
         details = f"Type: {edge_data.get('type', 'line')}"
-        details += f"\nStart: {fmt_point(edge_data.get('start'))}"
-        details += f"\nEnd: {fmt_point(edge_data.get('end'))}"
+        details += f"\nStart: {fmt_point(edge_data.get('start'))} \n"
+        details += f"\nEnd: {fmt_point(edge_data.get('end'))} \n"
 
         if 'intermediate' in edge_data:
             intermediate = edge_data['intermediate']

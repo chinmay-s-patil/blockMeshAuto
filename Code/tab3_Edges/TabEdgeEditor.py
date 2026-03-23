@@ -466,8 +466,8 @@ class Tab3EdgeEditor:
             text = f"Start: {self._fmt_point(self.selected_points[0])}"
             info = "Select end point"
         elif n == 2:
-            text = (f"Start: {self._fmt_point(self.selected_points[0])}"
-                   f"End: {self._fmt_point(self.selected_points[1])}")
+            text = (f"Start: {self._fmt_point(self.selected_points[0])} \n"
+                   f"End: {self._fmt_point(self.selected_points[1])} \n")
             if edge_type == 'arc':
                 info = "Select mid point or use Arc Helper"
             elif edge_type in ['spline', 'polyLine']:
@@ -476,9 +476,9 @@ class Tab3EdgeEditor:
             else:
                 info = "Ready to create"
         elif n == 3 and edge_type == 'arc':
-            text = (f"Start: {self._fmt_point(self.selected_points[0])}"
-                   f"End: {self._fmt_point(self.selected_points[1])}"
-                   f"Mid: {self._fmt_point(self.selected_points[2])}")
+            text = (f"Start: {self._fmt_point(self.selected_points[0])} \n"
+                   f"End: {self._fmt_point(self.selected_points[1])} \n"
+                   f"Mid: {self._fmt_point(self.selected_points[2])} \n")
             info = "Ready to create"
         else:
             text = f"Selected: {n} points"

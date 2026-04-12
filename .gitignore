@@ -136,3 +136,5 @@ mesh_temp.json
 !Examples/**/*.json
 
 !new_data_structure.json
+
+*.deb

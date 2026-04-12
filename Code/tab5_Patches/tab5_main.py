@@ -8,6 +8,7 @@ Changes from original:
   • Control bar is a proper tk.Frame (no canvas .place() overlays)
   • Opacity toggle button wired to renderer.toggle_opacity()
   • Legend is a tkinter overlay in the renderer – no VTK text actors
+  • reset(new_mesh_data) propagates a fresh MeshData to ALL sub-objects
 """
 
 import tkinter as tk
@@ -103,7 +104,6 @@ class Tab5HexPatches:
             activebackground=self.colors['button_active'], width=12, **bkw)
         self.mode_button.pack(side=tk.LEFT, padx=4, pady=3)
 
-        # ── Opacity toggle ────────────────────────────────────────────────
         self.opacity_button = tk.Button(
             ctrl, text="◑ Translucent",
             command=self._toggle_opacity,
@@ -199,12 +199,9 @@ class Tab5HexPatches:
         self.notebook = ttk.Notebook(right_frame)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        self.tab_patches    = tk.Frame(self.notebook,
-                                       bg=self.colors['secondary'])
-        self.tab_assignment = tk.Frame(self.notebook,
-                                       bg=self.colors['secondary'])
-        self.tab_normals    = tk.Frame(self.notebook,
-                                       bg=self.colors['secondary'])
+        self.tab_patches    = tk.Frame(self.notebook, bg=self.colors['secondary'])
+        self.tab_assignment = tk.Frame(self.notebook, bg=self.colors['secondary'])
+        self.tab_normals    = tk.Frame(self.notebook, bg=self.colors['secondary'])
 
         self.notebook.add(self.tab_patches,    text="Patches")
         self.notebook.add(self.tab_assignment, text="Assign")
@@ -285,6 +282,69 @@ class Tab5HexPatches:
 
         self._update_status()
         self.renderer.draw()
+
+    # ── reset (called by main.py new_project) ─────────────────────────────
+
+    def reset(self, new_mesh_data) -> None:
+        """
+        Replace ALL internal mesh_data references with a fresh MeshData object.
+        This ensures no stale patches, hexes, or faces survive a New Project.
+        """
+        self.mesh_data = new_mesh_data
+
+        # Renderer
+        if self.renderer is not None:
+            self.renderer.mesh_data = new_mesh_data
+            self.renderer.invalidate_cache()
+            self.renderer.selected_faces.clear()
+            self.renderer.patch_edit_mode = False
+
+        # Patch list panel
+        if hasattr(self, 'patch_list_panel') and self.patch_list_panel is not None:
+            self.patch_list_panel.mesh_data = new_mesh_data
+            self.patch_list_panel.refresh_list()   # clears the listbox
+
+        # Patch assignment panel
+        if hasattr(self, 'patch_panel') and self.patch_panel is not None:
+            self.patch_panel.mesh_data = new_mesh_data
+            self.patch_panel.renderer  = self.renderer
+            self.patch_panel.selected_faces = []
+            try:
+                self.patch_panel.selection_label.config(
+                    text="Selected: 0 faces", fg=self.colors['warning'])
+            except Exception:
+                pass
+
+        # Normals tab
+        if hasattr(self, 'normals_tab') and self.normals_tab is not None:
+            self.normals_tab.mesh_data           = new_mesh_data
+            self.normals_tab.renderer            = self.renderer
+            self.normals_tab.selected_patch_name = None
+            self.normals_tab.patch_faces         = []
+            self.normals_tab.flip_mode           = False
+            try:
+                self.normals_tab._refresh_patch_list()
+            except Exception:
+                pass
+
+        # Close any open patch-editor dialog
+        if self.patch_editor_dialog is not None:
+            try:
+                self.patch_editor_dialog.dialog.destroy()
+            except Exception:
+                pass
+            self.patch_editor_dialog = None
+
+        # Reset UI state
+        self.hide_mode = False
+        self.mode_button.config(text="Mode: Select",
+                                bg=self.colors['button_bg'],
+                                fg=self.colors['button_fg'])
+
+        # Redraw empty scene and refresh status
+        if self.renderer is not None:
+            self.renderer.draw()
+        self._update_status()
 
     # ── toolbar callbacks ─────────────────────────────────────────────────
 
@@ -454,7 +514,6 @@ class Tab5HexPatches:
     def _on_patch_selected(self, patch_name, patch_data,
                            highlight_faces=None) -> None:
         if highlight_faces and self.renderer:
-            # Use highlight_faces() which validates ids and builds geometry first
             face_ids = [f for f in highlight_faces if f is not None]
             self.renderer.highlight_faces(face_ids)
             self.patch_panel.set_selected_faces(face_ids)

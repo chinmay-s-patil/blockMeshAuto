@@ -1,0 +1,5 @@
+Package: blockMeshAuto
+Version: 2.1.1
+Architecture: all
+Maintainer: Chinmay S Patil <patil.chinmay3031@gmail.com>
+Description: Use to make blockMeshDict

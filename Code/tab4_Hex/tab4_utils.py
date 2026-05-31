@@ -46,6 +46,9 @@ def auto_sort_hex_points(point_ids, mesh_data):
 def calculate_divisions_from_cell_size(vertices, cell_size):
     """
     Calculate divisions from cell size using OpenFOAM edge definitions.
+    Uses the maximum edge length in each direction so that, when parallel
+    edges differ in length (tapered / non-uniform blocks), the larger
+    dimension drives the cell count and the mesh is never under-resolved.
     Returns (nx, ny, nz) tuple.
     """
     # X edges: (0,1), (3,2), (4,5), (7,6)
@@ -58,10 +61,12 @@ def calculate_divisions_from_cell_size(vertices, cell_size):
     z_edges = [np.linalg.norm(np.array(vertices[i]) - np.array(vertices[j]))
                for i, j in [(0,4), (1,5), (2,6), (3,7)]]
 
-    nx = max(1, int(round(np.mean(x_edges) / cell_size)))
-    ny = max(1, int(round(np.mean(y_edges) / cell_size)))
-    nz = max(1, int(round(np.mean(z_edges) / cell_size)))
+    # Use max edge length so mismatched-length blocks are never under-resolved
+    nx = max(1, int(round(np.max(x_edges) / cell_size)))
+    ny = max(1, int(round(np.max(y_edges) / cell_size)))
+    nz = max(1, int(round(np.max(z_edges) / cell_size)))
     return nx, ny, nz
+
 
 
 def get_block_vertices(block_data, mesh_data):

@@ -1,9 +1,10 @@
 [Desktop Entry]
 Type=Application
 Version=2.1.1
-Name=blockMeshAuto
-Path=usr/bin
+Name=BlockMeshAuto
+Comment=GUI tool for OpenFOAM blockMesh generation
+Path=/usr/lib/blockMeshAuto
 Exec=blockMeshAuto
-Icon=
+Icon=/usr/lib/blockMeshAuto/BlockMeshLogo.png
 Terminal=false
-Categories=Python;OpenFOAM;
+Categories=Science;Engineering;

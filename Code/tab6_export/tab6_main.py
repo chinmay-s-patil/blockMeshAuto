@@ -783,7 +783,69 @@ class TabExport:
         # Edges
         lines.append("edges")
         lines.append("(")
-        lines.append(");")
+
+        for edge_id, edge_data in self.mesh_data.edges.items():
+            edge_type = edge_data.get('type', 'line')
+            start = edge_data.get('start')
+            end = edge_data.get('end')
+            intermediate = edge_data.get('intermediate')
+
+            # Resolve start/end to 0-based vertex indices
+            def resolve_point(ref):
+                """Resolve a point ref (int ID or coordinate tuple) to export string."""
+                if isinstance(ref, int):
+                    return str(point_map.get(ref, ref))
+                elif isinstance(ref, (list, tuple)) and len(ref) == 3:
+                    return f"({ref[0]:.6f} {ref[1]:.6f} {ref[2]:.6f})"
+                return str(ref)
+
+            def resolve_coord(ref):
+                """Resolve a point ref to a coordinate string for inline use."""
+                if isinstance(ref, int):
+                    # Look up actual coordinates
+                    pt = self.mesh_data.get_point(ref)
+                    if pt:
+                        return f"({pt['x']:.6f} {pt['y']:.6f} {pt['z']:.6f})"
+                    return f"(0 0 0)"
+                elif isinstance(ref, (list, tuple)) and len(ref) == 3:
+                    return f"({ref[0]:.6f} {ref[1]:.6f} {ref[2]:.6f})"
+                return "(0 0 0)"
+
+            if start is None or end is None:
+                continue
+
+            start_idx = point_map.get(int(start), int(start)) if isinstance(start, int) else resolve_point(start)
+            end_idx   = point_map.get(int(end),   int(end))   if isinstance(end, int)   else resolve_point(end)
+
+            if edge_type == 'arc':
+                # arc <v0> <v1> <midpoint>
+                if intermediate is not None:
+                    mid_str = resolve_coord(intermediate)
+                    lines.append(f"    arc {start_idx} {end_idx} {mid_str}")
+                else:
+                    lines.append(f"    // arc {start_idx} {end_idx} (no intermediate defined)")
+
+            elif edge_type in ('spline', 'polyLine'):
+                # spline/polyLine <v0> <v1> ( (x y z) ... )
+                keyword = 'spline' if edge_type == 'spline' else 'polyLine'
+                lines.append(f"    {keyword} {start_idx} {end_idx}")
+                lines.append("    (")
+                if isinstance(intermediate, list):
+                    for pt in intermediate:
+                        lines.append(f"        {resolve_coord(pt)}")
+                elif intermediate is not None:
+                    lines.append(f"        {resolve_coord(intermediate)}")
+                lines.append("    )")
+
+            elif edge_type == 'line':
+                # Straight lines are implicit in blockMesh — write as a comment for reference
+                lines.append(f"    // line {start_idx} {end_idx} (straight — no entry needed)")
+
+            else:
+                # Unknown type — write as comment
+                lines.append(f"    // edge {edge_id}: unknown type '{edge_type}' ({start_idx} {end_idx})")
+
+        lines.append(");")  
         lines.append("")
 
         # Patches

@@ -1,0 +1,65 @@
+{
+    "Points":
+    {
+        "Point num: int (Point 1)":
+        {
+            "X": "float",
+            "Y": "float",
+            "Z": "float"
+        },
+        "Point num: int (Point 2)":
+        {
+            "X": "float",
+            "Y": "float",
+            "Z": "float"
+        }
+    },
+    "Layers":
+    {
+        "Layer Name: int":
+        {
+            "Points (Ref)": "1, 2... (Nums reffering to points)"
+        }
+    },
+    "Connections":
+    {
+        "Connection num: int":
+        {
+            "Point 1": "int, (Nums reffering to points)",
+            "Point 2": "int"
+        }
+    },
+    "Edges":
+    {
+        "Edge num: int":
+        {
+            "type": "str",
+            "Points": "1, 2,...",
+            "Input Points": "(X,Y,Z), (X,Y,Z), ...."
+        }
+    },
+    "Hexes":
+    {
+        "Hex num: int":
+        {
+            "Points": "Point 1, Point 2, ... (8 entries maximum, allow lower than 8 for wedge or any other things)"
+        }
+    },
+    "Patches":
+    {
+        "Patch name: str":
+        {
+            "type": "str",
+            "Points": "Point 1, Point 2 ...,",
+            "Normal": "Direction: (1 or -1)"
+        }
+    },
+    "Specs":
+    {
+        "sketch_plane": "XY",
+        "project_name": "Name",
+        "project_description": "Description",
+        "unit_system": "Unit",
+        "unit_sci_exponent": "int"
+    }
+}

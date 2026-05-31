@@ -2,4 +2,9 @@ Package: blockMeshAuto
 Version: 2.1.1
 Architecture: all
 Maintainer: Chinmay S Patil <patil.chinmay3031@gmail.com>
-Description: Use to make blockMeshDict
+Installed-Size: 784
+Depends: python3 (>= 3.10), python3-tk, python3-numpy, python3-pil
+Description: BlockMeshAuto – GUI for OpenFOAM blockMesh generation
+ A professional dark-mode GUI that lets you define points, connections,
+ hex blocks, curved edges, and boundary patches, then exports a valid
+ OpenFOAM blockMeshDict file.

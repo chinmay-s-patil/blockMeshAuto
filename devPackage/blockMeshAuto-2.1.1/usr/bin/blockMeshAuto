@@ -1,3 +1,2 @@
 #!/usr/bin/env bash
-python3 /usr/lib/blockMeshAuto/main.py
-
+python3 /usr/lib/blockMeshAuto/main.py "$@"

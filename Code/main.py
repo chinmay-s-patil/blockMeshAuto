@@ -25,7 +25,7 @@ from tab6_export.tab6_main import TabExport
 from utils.history_manager import HistoryManager
 from utils.blockmesh_importer import import_blockmesh_file, BlockMeshImporter
 
-# ── Help text for each tab (F1) ──────────────────────────────────────────────
+#  Help text for each tab (F1) 
 
 HELP_TEXTS = {
     0: (
@@ -285,7 +285,7 @@ class MeshBuilderApp:
         if self.working_dir:
             self.root.after(600, self._try_auto_import)
 
-    # ── Window icon ──────────────────────────────────────────────────────────
+    #  Window icon 
 
     def _set_window_icon(self):
         """Try to set the window icon using BlockMeshLogo.png from base dir."""
@@ -304,7 +304,7 @@ class MeshBuilderApp:
                     pass
                 return
 
-    # ── Auto-import from working directory ───────────────────────────────────
+    #  Auto-import from working directory 
 
     def _try_auto_import(self):
         """If a working directory was given, look for system/blockMeshDict."""
@@ -325,7 +325,7 @@ class MeshBuilderApp:
                 f"BlockmeshAuto — {self.working_dir}"
             )
 
-    # ── Scheduling / cleanup ─────────────────────────────────────────────────
+    #  Scheduling / cleanup 
 
     def _schedule_auto_save(self):
         self._auto_save_id = self.root.after(30000, self._auto_save_wrapper)
@@ -357,7 +357,7 @@ class MeshBuilderApp:
             pass
         self.root.destroy()
 
-    # ── Temp directory ───────────────────────────────────────────────────────
+    #  Temp directory 
 
     def _ensure_temp_dir(self):
         temp_dir = self.get_temp_dir()
@@ -385,7 +385,7 @@ class MeshBuilderApp:
             return self._fallback_temp_dir
         return os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
 
-    # ── UI setup ─────────────────────────────────────────────────────────────
+    #  UI setup 
 
     def setup_dark_mode(self):
         self.root.configure(bg=self.colors['bg'])
@@ -506,7 +506,7 @@ class MeshBuilderApp:
         if not self.history_manager.redo():
             print("Nothing to redo")
 
-    # ── F1 Help ──────────────────────────────────────────────────────────────
+    #  F1 Help 
 
     def show_help(self, event=None):
         """Show context-sensitive help for the currently visible tab."""
@@ -676,7 +676,7 @@ class MeshBuilderApp:
             "Ctrl+Z / Ctrl+Y — Undo / Redo"
         )
 
-    # ── BlockMesh import ─────────────────────────────────────────────────────
+    #  BlockMesh import 
 
     def import_blockmesh(self):
         has_geometry = len(self.mesh_data.points) > 0
@@ -698,7 +698,7 @@ class MeshBuilderApp:
             messagebox.showinfo("Import Successful",
                               f"Project imported: {self.mesh_data.project_name}")
 
-    # ── Notebook / tabs ──────────────────────────────────────────────────────
+    #  Notebook / tabs 
 
     def setup_notebook(self):
         self.notebook = ttk.Notebook(self.root)
@@ -726,7 +726,7 @@ class MeshBuilderApp:
         self.patches_3d       = Tab5HexPatches(self.tab_3d, self.mesh_data)
         self.export_tab       = TabExport(self.tab_export, self.mesh_data)
 
-    # ── File helpers ─────────────────────────────────────────────────────────
+    #  File helpers 
 
     def get_temp_filename(self):
         safe_name = self.mesh_data.get_safe_project_name()
@@ -736,7 +736,7 @@ class MeshBuilderApp:
         safe_name = self.mesh_data.get_safe_project_name()
         return f"{safe_name}.json"
 
-    # ── Save / Load ──────────────────────────────────────────────────────────
+    #  Save / Load 
 
     def save_to_json(self):
         if hasattr(self.project_settings, 'save_all_settings'):
@@ -802,7 +802,7 @@ class MeshBuilderApp:
                 import traceback
                 traceback.print_exc()
 
-    # ── View update ──────────────────────────────────────────────────────────
+    #  View update 
 
     def _update_all_views(self):
         try:
@@ -839,7 +839,7 @@ class MeshBuilderApp:
         except Exception as e:
             print(f"Warning: Could not update export tab: {e}")
 
-    # ── Auto-save (with rename cleanup) ──────────────────────────────────────
+    #  Auto-save (with rename cleanup) 
 
     def auto_save(self):
         try:
@@ -891,7 +891,7 @@ class MeshBuilderApp:
             if self.auto_save_error_count <= 3:
                 print(f"Auto-save error (attempt {self.auto_save_error_count}): {e}")
 
-    # ── New project ──────────────────────────────────────────────────────────
+    #  New project 
 
     def new_project(self):
         """Start a new project, fully clearing all tab state."""
@@ -984,24 +984,49 @@ class MeshBuilderApp:
 
 
 def main():
-    # Parse optional directory argument
+    # Parse optional directory or .json file argument
     working_dir = None
+    json_file = None
     args = sys.argv[1:]
     for arg in args:
         if arg in ('-h', '--help'):
-            print("Usage: blockMeshAuto [directory]")
-            print("  directory  Optional working directory.")
-            print("             If system/blockMeshDict exists inside it,")
-            print("             you will be offered to auto-import it.")
+            print("Usage: blockMeshAuto [path]")
+            print("  path  Optional working directory OR a .json project file.")
+            print("        Directory: if system/blockMeshDict exists, you will")
+            print("                   be offered to auto-import it.")
+            print("        JSON file: loads the project directly on startup.")
             sys.exit(0)
         if not arg.startswith('-'):
-            if os.path.isdir(arg):
-                working_dir = arg
+            abs_arg = os.path.abspath(arg)
+            if os.path.isdir(abs_arg):
+                working_dir = abs_arg
+            elif os.path.isfile(abs_arg) and abs_arg.lower().endswith('.json'):
+                json_file = abs_arg
+                # Set working dir to the file's parent so auto-save goes there
+                working_dir = os.path.dirname(abs_arg)
             else:
-                print(f"Warning: '{arg}' is not a valid directory — ignoring.")
+                print(f"Warning: '{arg}' is not a valid directory or .json file — ignoring.")
 
     root = tk.Tk()
     app = MeshBuilderApp(root, working_dir=working_dir)
+
+    # If a JSON file was passed, load it after the window is ready
+    if json_file:
+        def _load_json_on_startup():
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if not isinstance(data, dict):
+                    raise ValueError("Invalid JSON structure: root must be an object")
+                app.mesh_data.from_dict(data)
+                app._last_safe_project_name = app.mesh_data.get_safe_project_name()
+                app._update_all_views()
+                app.root.title(f"BlockmeshAuto — {os.path.basename(json_file)}")
+            except Exception as e:
+                from tkinter import messagebox
+                messagebox.showerror("Load Error", f"Could not load '{json_file}':\n{e}")
+        root.after(400, _load_json_on_startup)
+
     root.mainloop()
 
 

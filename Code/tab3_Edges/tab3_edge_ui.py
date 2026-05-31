@@ -47,9 +47,9 @@ class EdgeEditorUI:
         self.edit_intermediate_frame = None
         self.edit_intermediate_listbox = None
 
-    # ──────────────────────────────────────────────────────────────
+    # 
     # Main frame setup
-    # ──────────────────────────────────────────────────────────────
+    # 
     def setup_main_ui(self):
         """Setup main UI – viewer on left, right-panel tabs on right"""
         main_container = tk.Frame(self.parent, bg=self.colors['bg'])
@@ -88,7 +88,7 @@ class EdgeEditorUI:
                                    anchor=tk.W)
         self.info_label.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=2)
 
-        # ── Notebook (right panel) ──────────────────────────────────
+        #  Notebook (right panel) 
         style = ttk.Style()
         style.theme_use('default')
         style.configure("Edge.TNotebook",
@@ -126,9 +126,9 @@ class EdgeEditorUI:
 
         return viewer_frame, controls_container
 
-    # ──────────────────────────────────────────────────────────────
+    # 
     # Helpers
-    # ──────────────────────────────────────────────────────────────
+    # 
     def _section(self, parent, title, pady=5):
         """LabelFrame with border going through the title text, matching overall app style."""
         lf = tk.LabelFrame(parent, text=f"  {title}  ",
@@ -176,9 +176,9 @@ class EdgeEditorUI:
             if combo:
                 combo['values'] = choices
 
-    # ──────────────────────────────────────────────────────────────
+    # 
     # CREATE TAB
-    # ──────────────────────────────────────────────────────────────
+    # 
     def setup_create_tab(self, current_edge_type_var, manual_coords):
         """Setup Create Edge tab – compact layout that doesn't overflow."""
         self.manual_coords = manual_coords
@@ -186,7 +186,7 @@ class EdgeEditorUI:
         outer = tk.Frame(self.tab_create, bg=self.colors['secondary'])
         outer.pack(fill=tk.BOTH, expand=True)
 
-        # ── Edge Type section ────────────────────────────────────
+        #  Edge Type section 
         type_inner = self._section(outer, "Edge Type", pady=(8, 4))
 
         edge_types = [
@@ -209,7 +209,7 @@ class EdgeEditorUI:
             tk.Label(row, text=desc, font=("Segoe UI", 8),
                      bg=self.colors['secondary'], fg='#888888').pack(side=tk.LEFT, padx=(8, 0))
 
-        # ── Configuration section (dynamic) ──────────────────────
+        #  Configuration section (dynamic) 
         # The config_frame is the LabelFrame; we switch arc_config / spline_config inside it
         self.config_frame = tk.LabelFrame(outer, text="  Configuration  ",
                                           bg=self.colors['secondary'],
@@ -225,7 +225,7 @@ class EdgeEditorUI:
         # Spline/PolyLine config panel
         self._build_spline_config(self.config_frame, manual_coords)
 
-        # ── Status ───────────────────────────────────────────────
+        #  Status 
         status_inner = self._section(outer, "Status", pady=(4, 4))
         self.status_label = tk.Label(status_inner, text="Ready – Select start point",
                                      font=("Consolas", 9),
@@ -234,13 +234,13 @@ class EdgeEditorUI:
                                      justify=tk.LEFT)
         self.status_label.pack(anchor=tk.W)
 
-        # ── Action buttons ────────────────────────────────────────
+        #  Action buttons 
         action = tk.Frame(outer, bg=self.colors['secondary'])
         action.pack(fill=tk.X, padx=8, pady=(4, 8))
         self._btn(action, "✓ Create Edge", self.callbacks.get('create_edge'), 'success', width=16)
         self._btn(action, "✗ Reset", self.callbacks.get('reset_creation'), 'error', width=10)
 
-    # ─ Arc panels ─────────────────────────────────────────────────
+    #  Arc panels 
     def _build_arc_config(self, parent):
         self.arc_config = tk.Frame(parent, bg=self.colors['secondary'])
 
@@ -265,7 +265,7 @@ class EdgeEditorUI:
         self.arc_notebook = ttk.Notebook(helper_lf, style="Edge.TNotebook")
         self.arc_notebook.pack(fill=tk.X, padx=4, pady=4)
 
-        # ── Tab: Point on Arc ──
+        #  Tab: Point on Arc 
         tab1 = tk.Frame(self.arc_notebook, bg=self.colors['secondary'])
         self.arc_notebook.add(tab1, text="Point")
 
@@ -295,7 +295,7 @@ class EdgeEditorUI:
                  highlightthickness=1).pack(side=tk.LEFT, padx=(4, 4))
         self._btn(r2, "Set", self.callbacks.get('set_arc_point_manual'), 'button_bg', small=True)
 
-        # ── Tab: Center ──
+        #  Tab: Center 
         tab2 = tk.Frame(self.arc_notebook, bg=self.colors['secondary'])
         self.arc_notebook.add(tab2, text="Center")
 
@@ -324,7 +324,7 @@ class EdgeEditorUI:
                  highlightthickness=1).pack(side=tk.LEFT, padx=(4, 4))
         self._btn(r4, "Set", self.callbacks.get('set_center_manual'), 'button_bg', small=True)
 
-        # ── Tab: Radius ──
+        #  Tab: Radius 
         tab3 = tk.Frame(self.arc_notebook, bg=self.colors['secondary'])
         self.arc_notebook.add(tab3, text="Radius")
 
@@ -364,11 +364,11 @@ class EdgeEditorUI:
         self._btn(tab3, "✓ Use This Arc",
                   self.callbacks.get('use_selected_radius_arc'), 'success', width=15, side=tk.TOP)
 
-    # ─ Spline / PolyLine panels ────────────────────────────────────
+    #  Spline / PolyLine panels 
     def _build_spline_config(self, parent, manual_coords):
         self.spline_config = tk.Frame(parent, bg=self.colors['secondary'])
 
-        # ── Start / End point selectors (predefined points) ──
+        #  Start / End point selectors (predefined points) 
         endpts_lf = tk.LabelFrame(self.spline_config, text="  Start & End Points  ",
                                    bg=self.colors['secondary'], fg=self.colors['fg'],
                                    font=("Segoe UI", 8, "bold"),
@@ -400,7 +400,7 @@ class EdgeEditorUI:
         self._btn(set_row, "Set Start & End",
                   self.callbacks.get('set_spline_endpoints'), 'accent', small=True)
 
-        # ── Intermediate Points ──
+        #  Intermediate Points 
         inter_lf = tk.LabelFrame(self.spline_config, text="  Intermediate Points  ",
                                   bg=self.colors['secondary'], fg=self.colors['fg'],
                                   font=("Segoe UI", 8, "bold"),
@@ -426,7 +426,7 @@ class EdgeEditorUI:
         self._btn(sb_row, "Remove Last", self.callbacks.get('remove_spline_point'),'warning',  small=True)
         self._btn(sb_row, "Clear",       self.callbacks.get('clear_spline_points'), 'error',   small=True)
 
-        # ── Manual Point Entry (inside config) ──
+        #  Manual Point Entry (inside config) 
         man_lf = tk.LabelFrame(self.spline_config, text="  Manual Point Entry  ",
                                 bg=self.colors['secondary'], fg=self.colors['fg'],
                                 font=("Segoe UI", 8, "bold"),
@@ -452,9 +452,9 @@ class EdgeEditorUI:
         self._btn(mr, "Add Manual Point",
                   self.callbacks.get('add_manual_point'), 'accent', small=True)
 
-    # ──────────────────────────────────────────────────────────────
+    # 
     # MANAGE TAB
-    # ──────────────────────────────────────────────────────────────
+    # 
     def setup_manage_tab(self):
         """Setup Manage tab – edge list and details taking full height."""
         outer = tk.Frame(self.tab_manage, bg=self.colors['secondary'])
@@ -509,9 +509,9 @@ class EdgeEditorUI:
                                      wraplength=310)
         self.edge_details.pack(anchor=tk.W, padx=8, pady=6)
 
-    # ──────────────────────────────────────────────────────────────
+    # 
     # EDIT TAB
-    # ──────────────────────────────────────────────────────────────
+    # 
     def setup_edit_tab(self):
         """Setup Edit tab – fills available height evenly."""
         outer = tk.Frame(self.tab_edit, bg=self.colors['secondary'])

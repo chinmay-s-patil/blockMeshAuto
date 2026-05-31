@@ -60,13 +60,13 @@ class Tab5HexPatches:
 
         self.setup_ui()
 
-    # ── UI ────────────────────────────────────────────────────────────────
+    #  UI 
 
     def setup_ui(self) -> None:
         main_frame = tk.Frame(self.parent, bg=self.colors['bg'])
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-        # ── LEFT: 3-D area ───────────────────────────────────────────────
+        #  LEFT: 3-D area 
         left_frame = tk.Frame(main_frame, bg=self.colors['bg'])
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -146,7 +146,7 @@ class Tab5HexPatches:
                                      highlightbackground=self.colors['border'])
         self.viewer_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # ── RIGHT: scrollable control panel ──────────────────────────────
+        #  RIGHT: scrollable control panel 
         right_container = tk.Frame(main_frame, width=350,
                                    bg=self.colors['secondary'])
         right_container.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(5, 0))
@@ -234,7 +234,7 @@ class Tab5HexPatches:
 
         self._init_renderer()
 
-    # ── status ────────────────────────────────────────────────────────────
+    #  status 
 
     def _setup_status_section(self, parent) -> None:
         sf = tk.LabelFrame(parent, text="Status", padx=10, pady=10,
@@ -268,7 +268,7 @@ class Tab5HexPatches:
                                              bg=self.colors['secondary'])
         self.selected_count_label.pack(anchor=tk.W)
 
-    # ── renderer init ─────────────────────────────────────────────────────
+    #  renderer init 
 
     def _init_renderer(self) -> None:
         from tab5_Patches.tab5_pyvista_renderer import HexBlockRenderer
@@ -283,7 +283,7 @@ class Tab5HexPatches:
         self._update_status()
         self.renderer.draw()
 
-    # ── reset (called by main.py new_project) ─────────────────────────────
+    #  reset (called by main.py new_project) 
 
     def reset(self, new_mesh_data) -> None:
         """
@@ -346,7 +346,7 @@ class Tab5HexPatches:
             self.renderer.draw()
         self._update_status()
 
-    # ── toolbar callbacks ─────────────────────────────────────────────────
+    #  toolbar callbacks 
 
     def _toggle_patch_coloring(self) -> None:
         if not self.renderer:
@@ -406,7 +406,7 @@ class Tab5HexPatches:
             self._update_status()
             self.renderer.draw()
 
-    # ── selection / face callbacks ────────────────────────────────────────
+    #  selection / face callbacks 
 
     def _on_face_selection_changed(self, selected_faces: set) -> None:
         if self.hide_mode and self.renderer:
@@ -425,7 +425,7 @@ class Tab5HexPatches:
             self.selected_count_label.config(
                 text=f"Selected faces: {len(selected_faces)}")
 
-    # ── patch editor ──────────────────────────────────────────────────────
+    #  patch editor 
 
     def _on_patch_edit(self, patch_name, patch_data) -> None:
         from tab5_Patches.tab5_patch_editor import open_patch_editor
@@ -473,7 +473,7 @@ class Tab5HexPatches:
             if self.renderer and not self.patch_editor_dialog:
                 self.renderer.set_patch_edit_mode(False)
 
-    # ── patch assignment ──────────────────────────────────────────────────
+    #  patch assignment 
 
     def _on_patch_assigned(self, patch_data: dict) -> None:
         if 'clear' in patch_data:
@@ -520,7 +520,7 @@ class Tab5HexPatches:
             self.selected_count_label.config(
                 text=f"Selected faces: {len(face_ids)}")
 
-    # ── status ────────────────────────────────────────────────────────────
+    #  status 
 
     def _update_status(self) -> None:
         num_blocks = len(getattr(self.mesh_data, 'hex_blocks', {}))

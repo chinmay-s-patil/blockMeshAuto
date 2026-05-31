@@ -24,7 +24,7 @@ import vtk
 from vtk.util import numpy_support as vtk_np
 from PIL import Image, ImageTk
 
-# ── constants ────────────────────────────────────────────────────────────────
+#  constants 
 
 FACE_DEFS: list[tuple[str, list[int]]] = [
     ("bottom", [0, 3, 2, 1]),
@@ -59,7 +59,7 @@ _COL_SELECT  = (76, 201, 176)   # teal     (selected face)
 _BLIT_INTERVAL_MS = 16
 
 
-# ── renderer ──────────────────────────────────────────────────────────────────
+#  renderer 
 
 class HexBlockRenderer:
     """
@@ -77,25 +77,25 @@ class HexBlockRenderer:
         self.parent_frame = parent_frame
         self.mesh_data    = mesh_data
 
-        # ── geometry state ─────────────────────────────────────────────
+        #  geometry state 
         self.all_faces:      list[dict] = []
         self.selected_faces: set[int]   = set()
         self._face_cache_valid           = False
         self._cell_to_face:  list[int]  = []
 
-        # ── display options ────────────────────────────────────────────
+        #  display options 
         self.patch_coloring_mode = True
         self.opaque_mode         = False   # False = translucent, True = fully opaque
         self.patch_edit_mode     = False
         self.normals_tab         = None
 
-        # ── patch colour maps ──────────────────────────────────────────
+        #  patch colour maps 
         self._patch_color_map: dict[str, tuple]     = {}   # name → (r,g,b) 0-1
         self._patch_hex_map:   dict[str, str]       = {}   # name → "#rrggbb"
         self._face_to_patch:   dict[int, str]       = {}
         self._ptset_to_patch:  dict[frozenset, str] = {}
 
-        # ── VTK objects ────────────────────────────────────────────────
+        #  VTK objects 
         self.vtk_renderer:   Optional[vtk.vtkRenderer]               = None
         self.render_window:  Optional[vtk.vtkRenderWindow]           = None
         self.interactor:     Optional[vtk.vtkRenderWindowInteractor] = None
@@ -104,23 +104,23 @@ class HexBlockRenderer:
         self._axes_widget                                             = None
         self._w2i:           Optional[vtk.vtkWindowToImageFilter]    = None
 
-        # ── tk widgets ─────────────────────────────────────────────────
+        #  tk widgets 
         self.canvas:         Optional[tk.Canvas] = None
         self._legend_frame:  Optional[tk.Frame]  = None
         self._photo:         Optional[ImageTk.PhotoImage] = None  # must hold ref
 
-        # ── interaction state ──────────────────────────────────────────
+        #  interaction state 
         self._last_xy       = (0, 0)
         self._drag_btn: Optional[int] = None
         self._blit_pending  = False     # throttle flag
 
-        # ── external callbacks ─────────────────────────────────────────
+        #  external callbacks 
         self.on_selection_changed: Optional[Callable]              = None
         self._click_override:      Optional[Callable[[int], None]] = None
 
         self._build_pipeline()
 
-    # ── pipeline ──────────────────────────────────────────────────────────
+    #  pipeline 
 
     def _build_pipeline(self) -> None:
         """Create the tk.Canvas, VTK offscreen pipeline, and event bindings."""
@@ -178,7 +178,7 @@ class HexBlockRenderer:
         self._legend_frame = tk.Frame(self.canvas, bg="#1e1e1e")
         # positioned with .place() so it floats over the canvas
 
-        # ── Canvas event bindings ─────────────────────────────────────────
+        #  Canvas event bindings 
         # Control scheme matches Tab 3 / Tab 4:
         #   Left click/drag  → select faces  (ANSYS-style brush on drag)
         #   Middle drag      → rotate
@@ -203,7 +203,7 @@ class HexBlockRenderer:
         self.canvas.bind("<Button-5>",         self._on_wheel_down)
         self.canvas.bind("<Enter>",            lambda e: self.canvas.focus_set())
 
-    # ── blit (throttled) ──────────────────────────────────────────────────
+    #  blit (throttled) 
 
     def _vtk_y(self, y: int) -> int:
         """Canvas Y → VTK Y (VTK origin is bottom-left)."""
@@ -250,14 +250,14 @@ class HexBlockRenderer:
         if self._legend_frame:
             self._legend_frame.lift()
 
-    # ── resize ────────────────────────────────────────────────────────────
+    #  resize 
 
     def _on_resize(self, event) -> None:
         w, h = max(event.width, 50), max(event.height, 50)
         self.render_window.SetSize(w, h)
         self._blit()
 
-    # ── helpers ───────────────────────────────────────────────────────────
+    #  helpers 
 
     def _vtk_pos(self, event) -> tuple[int, int]:
         """Return (vtk_x, vtk_y) for an event, flipping Y."""
@@ -273,7 +273,7 @@ class HexBlockRenderer:
         self._last_xy = (event.x, event.y)
         self._schedule_blit()
 
-    # ── LEFT button – selection + ANSYS-style drag-select ─────────────────
+    #  LEFT button – selection + ANSYS-style drag-select 
     # Left button is handled entirely by us; no VTK camera events fired.
 
     def _on_lmb_press(self, event) -> None:
@@ -325,7 +325,7 @@ class HexBlockRenderer:
         # Pure click (no drag): toggle the single face under the cursor
         self._pick_and_toggle(event.x, event.y)
 
-    # ── MIDDLE button – rotate ─────────────────────────────────────────────
+    #  MIDDLE button – rotate 
     # Mapped to VTK LeftButton so TrackballCamera provides rotation.
 
     def _on_mmb_press(self, event) -> None:
@@ -342,7 +342,7 @@ class HexBlockRenderer:
         self.interactor.SetEventPosition(x, y)
         self.interactor.InvokeEvent("LeftButtonReleaseEvent")
 
-    # ── RIGHT button – pan ────────────────────────────────────────────────
+    #  RIGHT button – pan 
     # Mapped to VTK MiddleButton so TrackballCamera provides panning.
 
     def _on_rmb_press(self, event) -> None:
@@ -359,7 +359,7 @@ class HexBlockRenderer:
         self.interactor.SetEventPosition(x, y)
         self.interactor.InvokeEvent("MiddleButtonReleaseEvent")
 
-    # ── scroll – zoom ─────────────────────────────────────────────────────
+    #  scroll – zoom 
 
     def _on_wheel(self, event) -> None:
         x, y = self._vtk_pos(event)
@@ -380,7 +380,7 @@ class HexBlockRenderer:
         self.interactor.InvokeEvent("MouseWheelBackwardEvent")
         self._schedule_blit()
 
-    # ── face picking ──────────────────────────────────────────────────────
+    #  face picking 
 
     def _pick_face_id(self, cx: int, cy: int) -> int | None:
         """Ray-cast at canvas (cx, cy). Return face_id or None."""
@@ -411,7 +411,7 @@ class HexBlockRenderer:
         if self.on_selection_changed:
             self.on_selection_changed(self.selected_faces.copy())
 
-    # ── geometry building ─────────────────────────────────────────────────
+    #  geometry building 
 
     def _build_faces(self) -> None:
         if self._face_cache_valid:
@@ -493,7 +493,7 @@ class HexBlockRenderer:
             if fs in self._ptset_to_patch:
                 self._face_to_patch[face['face_id']] = self._ptset_to_patch[fs]
 
-    # ── VTK mesh helpers ──────────────────────────────────────────────────
+    #  VTK mesh helpers 
 
     def _face_opacity(self) -> float:
         return 1.0 if self.opaque_mode else 0.72
@@ -570,7 +570,7 @@ class HexBlockRenderer:
         p.SetSpecular(0.10)
         return actor
 
-    # ── scene update ──────────────────────────────────────────────────────
+    #  scene update 
 
     def _clear_actors(self) -> None:
         for attr in ('_surface_actor', '_sel_actor'):
@@ -631,7 +631,7 @@ class HexBlockRenderer:
         txt.GetPositionCoordinate().SetValue(0.5, 0.5)
         self.vtk_renderer.AddActor2D(txt)
 
-    # ── tk legend overlay ─────────────────────────────────────────────────
+    #  tk legend overlay 
 
     def _rebuild_legend(self) -> None:
         """
@@ -692,7 +692,7 @@ class HexBlockRenderer:
         self._legend_frame.place(x=cw - lw - 8, y=8)
         self._legend_frame.lift()
 
-    # ── public interface (mirrors original HexBlockRenderer) ──────────────
+    #  public interface (mirrors original HexBlockRenderer) 
 
     def highlight_faces(self, face_ids) -> None:
         """
